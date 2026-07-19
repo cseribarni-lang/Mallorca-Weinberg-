@@ -320,7 +320,7 @@ const SZ_TERULETEK_DEFAULT = [
   {id:"wb8",nev:"Alcúdia – Hasenfratz",ha:0.5812,fajtaToke:{"Cabernet Sauvignon":1500,"Merlot":1406}},
   {id:"wb9",nev:"Sta. Margalida – Nissen",ha:1.0,fajtaToke:{"Manto Negro":2500,"Callet":2500}}
 ];
-const SZT_KEY = 'teruletek'; // közös kulcs a Munka füllel (kézi/gépi munka Ft/ha, Ft/db számításai is ezt olvassák)
+const SZT_KEY = 'mallorca_szuret_teruletek'; // közös kulcs a Munka füllel (kézi/gépi munka Ft/ha, Ft/db számításai is ezt olvassák)
 let SZ_TERULETEK_OWN = SZ_TERULETEK_DEFAULT.map(t=>({...t}));
 let SZ_TERULETEK = [...SZ_TERULETEK_OWN, ...SZ_VASAROLT_TERULETEK];
 
@@ -365,7 +365,7 @@ async function sztPersist(){
   sztSync();
   await storage.set(SZT_KEY, JSON.stringify(SZ_TERULETEK_OWN));
 }
-const SZ_KEY = 'szuret_tetelek';
+const SZ_KEY = 'mallorca_szuret_tetelek';
 let szTetelek = [];
 
 function szSwitchTab(t){
@@ -374,6 +374,7 @@ function szSwitchTab(t){
   document.getElementById('sz-tab-arbeit').classList.toggle('on', t==='arbeit');
   document.getElementById('sz-tab-weinlese').classList.toggle('on', t==='weinlese');
   if(t==='weinlese') szRender();
+  if(t==='arbeit') document.getElementById('root').style.display='block';
 }
 
 function szFillTeruletSelect(){
@@ -514,7 +515,7 @@ window.addEventListener('sb-remote', (e)=>{
 const PK_SB_URL='https://tbigqmtirjaukhxwmqhw.supabase.co';
 const PK_SB_KEY='sb_publishable_6UD_aMtMYZxsHd5wXUmthw_UodjS_yH';
 const PK_SB_H={'apikey':PK_SB_KEY,'Authorization':'Bearer '+PK_SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
-const SZ_LINK_KEY='szuret_pincekonyv_linkek';
+const SZ_LINK_KEY='mallorca_pk_linkek';
 const SZ_VOROS_FAJTAK=['Manto Negro','Mantonegro','Callet','Cabernet Sauvignon','Merlot','Syrah','Tempranillo','Giro Ros'];
 let szLinkek = {};
 
@@ -675,238 +676,238 @@ window.szSwitchTab = szSwitchTab3;
   bar.appendChild(btn);
 })();
 </script>
-<!-- FLÄCHENVERWALTUNG – Mallorca Weinberg App -->
+<!-- FLÄCHENVERWALTUNG – Mallorca Weinberg App (interaktiv) -->
 <style>
 #flaechen-root{display:none;padding:52px 14px 90px;font-family:system-ui,-apple-system,sans-serif;background:#F7F4EE;min-height:100vh;box-sizing:border-box}
 #flaechen-root.on{display:block}
 .fl-card{background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
-.fl-h{font-family:Georgia,serif;font-size:18px;font-weight:700;color:#2C1810;margin:0 0 12px}
-.fl-meta{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-.fl-badge{background:#F3EDE8;color:#5C4030;font-size:12px;font-weight:600;padding:4px 10px;border-radius:12px}
-.fl-badge.rot{background:#EDE8F3;color:#3A2C5C}
-.fl-badge.gruen{background:#E8F3EB;color:#2C5C38}
+.fl-h{font-family:Georgia,serif;font-size:17px;font-weight:700;color:#2C1810;margin:0 0 12px}
+.fl-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.fl-badge{background:#F3EDE8;color:#5C4030;font-size:12px;font-weight:600;padding:3px 9px;border-radius:10px}
+.fl-badge.r{background:#F3E8ED;color:#5C2C40}
+.fl-badge.g{background:#E8F3EB;color:#2C5038}
+.fl-ov-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+.fl-ov-table th{text-align:left;padding:7px 8px;background:#2C1810;color:#fff;font-weight:600;font-size:12px}
+.fl-ov-table td{padding:7px 8px;border-bottom:1px solid #f0ece8;font-size:13px}
+.fl-ov-table tr:last-child td{font-weight:700;background:#F3EDE8}
+.fl-ov-table tr:hover td{background:#FBF8F5}
 .fl-sortentab{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}
-.fl-sortentab th{text-align:left;padding:5px 6px;background:#F3EDE8;color:#2C1810;font-weight:700;border-radius:4px}
-.fl-sortentab td{padding:5px 6px;border-bottom:1px solid #f0ece8}
-.fl-sortentab tr:last-child td{border-bottom:none}
-.fl-map-link{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#5C7A2E;text-decoration:none;font-weight:600;margin-top:6px}
-.fl-overview-table{width:100%;border-collapse:collapse;font-size:13px}
-.fl-overview-table th{text-align:left;padding:8px 10px;background:#2C1810;color:#fff;font-weight:600}
-.fl-overview-table td{padding:8px 10px;border-bottom:1px solid #f0ece8}
-.fl-overview-table tr:hover td{background:#FBF8F5}
-.fl-total-row td{font-weight:700;background:#F3EDE8}
+.fl-sortentab th{text-align:left;padding:5px 6px;background:#F3EDE8;color:#2C1810;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+.fl-sortentab td{padding:5px 6px;border-bottom:1px solid #f0ece8;vertical-align:middle}
+.fl-sortentab input{width:80px;padding:4px 6px;border:1px solid #ddd;border-radius:5px;font-size:12.5px;text-align:right}
+.fl-sortentab input:focus{border-color:#8B4513;outline:none}
+.fl-save-btn{margin-top:10px;padding:10px 18px;background:#2C1810;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer}
+.fl-save-btn:active{background:#1a0e08}
+.fl-save-ok{display:inline-block;margin-left:10px;font-size:12px;color:#2C5038;font-weight:600;opacity:0;transition:opacity .4s}
 </style>
 
 <div id="flaechen-root">
   <div class="fl-card">
-    <p class="fl-h">Weinberge Übersicht</p>
+    <p class="fl-h">Übersicht – alle Weinberge</p>
     <div style="overflow-x:auto">
-    <table class="fl-overview-table">
-      <thead><tr><th>Eigentümer</th><th>Ort</th><th>ha</th><th>Reben (offiz.)</th><th>Fehlstöcke</th><th>Aktiv</th></tr></thead>
-      <tbody>
-        <tr><td>Francisco Bähr</td><td>Alcúdia</td><td>2,68</td><td>13.314</td><td>1.000</td><td>12.314</td></tr>
-        <tr><td>Ana Carolina Alex</td><td>Binissalem</td><td>1,68</td><td>8.420</td><td>800</td><td>7.620</td></tr>
-        <tr><td>Klaus Klösters</td><td>Santanyí</td><td>1,42</td><td>7.100</td><td>800</td><td>6.300</td></tr>
-        <tr><td>Patrick Engler</td><td>Binissalem</td><td>5,40</td><td>26.978</td><td>0</td><td>26.978</td></tr>
-        <tr><td>Michael Hendricks</td><td>Campos / Sa Ràpita</td><td>1,96</td><td>9.775</td><td>0</td><td>9.775</td></tr>
-        <tr><td>Rainer &amp; Victoria Schmidt</td><td>Binissalem</td><td>4,96</td><td>24.806</td><td>0</td><td>24.806</td></tr>
-        <tr><td>Kathrin Bernarding</td><td>Sta. Margalida</td><td>0,49</td><td>2.474</td><td>0</td><td>2.474</td></tr>
-        <tr><td>Daniel Hasenfratz</td><td>Alcúdia</td><td>0,58</td><td>2.906</td><td>0</td><td>2.906</td></tr>
-        <tr><td>Timm Nissen</td><td>Sta. Margalida</td><td>1,00</td><td>5.000</td><td>0</td><td>5.000</td></tr>
-        <tr class="fl-total-row"><td colspan="2">GESAMT</td><td>19,67</td><td>100.773</td><td>2.600</td><td>98.173</td></tr>
-      </tbody>
+    <table class="fl-ov-table">
+      <thead><tr>
+        <th>Eigentümer</th><th>Ort</th><th>ha</th>
+        <th>Reben offiziell</th><th>Fehlstöcke</th><th>Aktiv</th>
+      </tr></thead>
+      <tbody id="fl-ov-tbody"></tbody>
     </table>
     </div>
   </div>
-
-  <!-- Bähr -->
-  <div class="fl-card">
-    <p class="fl-h">🌿 Alcúdia – Bähr</p>
-    <div class="fl-meta">
-      <span class="fl-badge">Francisco Bähr</span>
-      <span class="fl-badge">2,68 ha</span>
-      <span class="fl-badge">13.314 Reben (offiz.)</span>
-      <span class="fl-badge gruen">12.314 aktiv</span>
-      <span class="fl-badge rot">1.000 Fehlstöcke</span>
-      <span class="fl-badge">Vollerzogen / auf Biegedraht</span>
-    </div>
-    <a href="https://maps.app.goo.gl/QwZzPs7WTDLVTh2o6" target="_blank" class="fl-map-link">📍 Google Maps</a>
-    <table class="fl-sortentab">
-      <thead><tr><th>Rebsorte</th><th>Anzahl</th><th>Status</th><th>Auf Draht?</th></tr></thead>
-      <tbody>
-        <tr><td>Malvasia</td><td>1.118</td><td>Vollerzogen</td><td>✓</td></tr>
-        <tr><td>Chardonnay</td><td>1.305</td><td>Vollerzogen</td><td>✓</td></tr>
-        <tr><td>Prensal Blanc</td><td>1.593</td><td>Vollerzogen</td><td>✓</td></tr>
-        <tr><td>Sauvignon Blanc</td><td>1.982</td><td>Vollerzogen</td><td>✓</td></tr>
-        <tr><td>Tempranillo</td><td>1.907</td><td>Vollerzogen</td><td>✓</td></tr>
-        <tr><td>Callet</td><td>1.777</td><td>Vollerzogen</td><td>✓</td></tr>
-        <tr><td>Cabernet Sauvignon</td><td>1.956</td><td>Vollerzogen</td><td>✓</td></tr>
-        <tr><td>Mantonegro</td><td>1.776</td><td>Vollerzogen</td><td>✓</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Alex -->
-  <div class="fl-card">
-    <p class="fl-h">🌿 Binissalem – Alex</p>
-    <div class="fl-meta">
-      <span class="fl-badge">Ana Carolina Alex</span>
-      <span class="fl-badge">1,68 ha</span>
-      <span class="fl-badge">8.420 Reben (offiz.)</span>
-      <span class="fl-badge gruen">7.620 aktiv</span>
-      <span class="fl-badge rot">800 Fehlstöcke</span>
-      <span class="fl-badge">Stark zurückgeschnitten</span>
-    </div>
-    <a href="https://maps.app.goo.gl/WmRoEw2HbYU9Y9td7" target="_blank" class="fl-map-link">📍 Google Maps</a>
-    <table class="fl-sortentab">
-      <thead><tr><th>Rebsorte</th><th>Anzahl</th><th>Status</th><th>Auf Draht?</th></tr></thead>
-      <tbody>
-        <tr><td>Manto Negro</td><td>2.500</td><td>Vollerzogen</td><td>✓</td></tr>
-        <tr><td>Callet</td><td>2.000</td><td>Vollerzogen</td><td>✓</td></tr>
-        <tr><td>Prensal Blanc</td><td>2.000</td><td>Vollerzogen</td><td>✓</td></tr>
-        <tr><td>Giro Ros</td><td>1.814</td><td>Vollerzogen</td><td>✓</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Klösters -->
-  <div class="fl-card">
-    <p class="fl-h">🌿 Santanyí – Klösters</p>
-    <div class="fl-meta">
-      <span class="fl-badge">Klaus Klösters</span>
-      <span class="fl-badge">1,42 ha</span>
-      <span class="fl-badge">7.100 Reben (offiz.)</span>
-      <span class="fl-badge gruen">6.300 aktiv</span>
-      <span class="fl-badge rot">800 Fehlstöcke</span>
-      <span class="fl-badge">Ca. 50% auf Draht</span>
-    </div>
-    <a href="https://maps.app.goo.gl/hDydsoMEsFfEsNQdA" target="_blank" class="fl-map-link">📍 Google Maps</a>
-    <table class="fl-sortentab">
-      <thead><tr><th>Rebsorte</th><th>Anzahl</th><th>Status</th><th>Auf Draht?</th></tr></thead>
-      <tbody>
-        <tr><td>Callet</td><td>2.200</td><td>Teilw. auf Draht</td><td>teilw.</td></tr>
-        <tr><td>Cabernet Sauvignon</td><td>2.200</td><td>Teilw. auf Draht</td><td>teilw.</td></tr>
-        <tr><td>Merlot</td><td>1.900</td><td>Teilw. auf Draht</td><td>teilw.</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Engler -->
-  <div class="fl-card">
-    <p class="fl-h">🌿 Binissalem – Engler</p>
-    <div class="fl-meta">
-      <span class="fl-badge">Patrick Engler</span>
-      <span class="fl-badge">5,40 ha</span>
-      <span class="fl-badge">26.978 Reben</span>
-      <span class="fl-badge gruen">26.978 aktiv</span>
-    </div>
-    <table class="fl-sortentab">
-      <thead><tr><th>Rebsorte</th><th>Anzahl</th></tr></thead>
-      <tbody>
-        <tr><td>Manto Negro</td><td>8.000</td></tr>
-        <tr><td>Callet</td><td>7.000</td></tr>
-        <tr><td>Prensal Blanc</td><td>6.000</td></tr>
-        <tr><td>Syrah</td><td>5.978</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Hendricks -->
-  <div class="fl-card">
-    <p class="fl-h">🌿 Campos – Hendricks</p>
-    <div class="fl-meta">
-      <span class="fl-badge">Michael Hendricks</span>
-      <span class="fl-badge">1,96 ha</span>
-      <span class="fl-badge">9.775 Reben</span>
-      <span class="fl-badge gruen">9.775 aktiv</span>
-    </div>
-    <table class="fl-sortentab">
-      <thead><tr><th>Rebsorte</th><th>Anzahl</th></tr></thead>
-      <tbody>
-        <tr><td>Cabernet Sauvignon</td><td>3.500</td></tr>
-        <tr><td>Merlot</td><td>3.000</td></tr>
-        <tr><td>Callet</td><td>3.275</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Schmidt -->
-  <div class="fl-card">
-    <p class="fl-h">🌿 Binissalem – Schmidt</p>
-    <div class="fl-meta">
-      <span class="fl-badge">Rainer &amp; Victoria Schmidt</span>
-      <span class="fl-badge">4,96 ha</span>
-      <span class="fl-badge">24.806 Reben</span>
-      <span class="fl-badge gruen">24.806 aktiv</span>
-    </div>
-    <table class="fl-sortentab">
-      <thead><tr><th>Rebsorte</th><th>Anzahl</th></tr></thead>
-      <tbody>
-        <tr><td>Manto Negro</td><td>8.000</td></tr>
-        <tr><td>Callet</td><td>7.000</td></tr>
-        <tr><td>Chardonnay</td><td>5.000</td></tr>
-        <tr><td>Prensal Blanc</td><td>4.806</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Bernarding -->
-  <div class="fl-card">
-    <p class="fl-h">🌿 Sta. Margalida – Bernarding</p>
-    <div class="fl-meta">
-      <span class="fl-badge">Kathrin Bernarding</span>
-      <span class="fl-badge">0,49 ha</span>
-      <span class="fl-badge">2.474 Reben</span>
-      <span class="fl-badge gruen">2.474 aktiv</span>
-    </div>
-    <table class="fl-sortentab">
-      <thead><tr><th>Rebsorte</th><th>Anzahl</th></tr></thead>
-      <tbody>
-        <tr><td>Callet</td><td>1.200</td></tr>
-        <tr><td>Manto Negro</td><td>1.274</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Hasenfratz -->
-  <div class="fl-card">
-    <p class="fl-h">🌿 Alcúdia – Hasenfratz</p>
-    <div class="fl-meta">
-      <span class="fl-badge">Daniel Hasenfratz</span>
-      <span class="fl-badge">0,58 ha</span>
-      <span class="fl-badge">2.906 Reben</span>
-      <span class="fl-badge gruen">2.906 aktiv</span>
-    </div>
-    <table class="fl-sortentab">
-      <thead><tr><th>Rebsorte</th><th>Anzahl</th></tr></thead>
-      <tbody>
-        <tr><td>Cabernet Sauvignon</td><td>1.500</td></tr>
-        <tr><td>Merlot</td><td>1.406</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Nissen -->
-  <div class="fl-card">
-    <p class="fl-h">🌿 Sta. Margalida – Nissen</p>
-    <div class="fl-meta">
-      <span class="fl-badge">Timm Nissen</span>
-      <span class="fl-badge">1,00 ha</span>
-      <span class="fl-badge">5.000 Reben</span>
-      <span class="fl-badge gruen">5.000 aktiv</span>
-    </div>
-    <table class="fl-sortentab">
-      <thead><tr><th>Rebsorte</th><th>Anzahl</th></tr></thead>
-      <tbody>
-        <tr><td>Manto Negro</td><td>2.500</td></tr>
-        <tr><td>Callet</td><td>2.500</td></tr>
-      </tbody>
-    </table>
-  </div>
+  <div id="fl-weinberge-detail"></div>
 </div>
 
 <script>
-// Flächenverwaltung Tab-Switching Integration
+// ── Flächenverwaltung data & persistence ──────────────────────────────────────
+const FL_KEY = 'mallorca_flaechen_v1';
+
+const FL_WEINBERGE_DEFAULT = [
+  {id:"wb1", eigentumer:"Francisco Bähr",     ort:"Alcúdia",               ha:2.68,
+   sorten:[
+     {name:"Malvasia",           offiziell:1118, fehlstoecke:0},
+     {name:"Chardonnay",         offiziell:1305, fehlstoecke:0},
+     {name:"Prensal Blanc",      offiziell:1593, fehlstoecke:0},
+     {name:"Sauvignon Blanc",    offiziell:1982, fehlstoecke:0},
+     {name:"Tempranillo",        offiziell:1907, fehlstoecke:0},
+     {name:"Callet",             offiziell:1777, fehlstoecke:0},
+     {name:"Cabernet Sauvignon", offiziell:1956, fehlstoecke:0},
+     {name:"Mantonegro",         offiziell:1776, fehlstoecke:0}
+   ]},
+  {id:"wb2", eigentumer:"Ana Carolina Alex",  ort:"Binissalem",            ha:1.68,
+   sorten:[
+     {name:"Manto Negro",        offiziell:2500, fehlstoecke:0},
+     {name:"Callet",             offiziell:2000, fehlstoecke:0},
+     {name:"Prensal Blanc",      offiziell:2000, fehlstoecke:0},
+     {name:"Giro Ros",           offiziell:1814, fehlstoecke:0}
+   ]},
+  {id:"wb3", eigentumer:"Klaus Klösters",     ort:"Santanyí",              ha:1.42,
+   sorten:[
+     {name:"Callet",             offiziell:2200, fehlstoecke:0},
+     {name:"Cabernet Sauvignon", offiziell:2200, fehlstoecke:0},
+     {name:"Merlot",             offiziell:1900, fehlstoecke:0}
+   ]},
+  {id:"wb4", eigentumer:"Patrick Engler",     ort:"Binissalem",            ha:5.3956,
+   sorten:[
+     {name:"Manto Negro",        offiziell:8000, fehlstoecke:0},
+     {name:"Callet",             offiziell:7000, fehlstoecke:0},
+     {name:"Prensal Blanc",      offiziell:6000, fehlstoecke:0},
+     {name:"Syrah",              offiziell:5978, fehlstoecke:0}
+   ]},
+  {id:"wb5", eigentumer:"Michael Hendricks",  ort:"Campos / Sa Ràpita",   ha:1.955,
+   sorten:[
+     {name:"Cabernet Sauvignon", offiziell:3500, fehlstoecke:0},
+     {name:"Merlot",             offiziell:3000, fehlstoecke:0},
+     {name:"Callet",             offiziell:3275, fehlstoecke:0}
+   ]},
+  {id:"wb6", eigentumer:"R. & V. Schmidt",    ort:"Binissalem",            ha:4.9612,
+   sorten:[
+     {name:"Manto Negro",        offiziell:8000, fehlstoecke:0},
+     {name:"Callet",             offiziell:7000, fehlstoecke:0},
+     {name:"Chardonnay",         offiziell:5000, fehlstoecke:0},
+     {name:"Prensal Blanc",      offiziell:4806, fehlstoecke:0}
+   ]},
+  {id:"wb7", eigentumer:"Kathrin Bernarding", ort:"Sta. Margalida",        ha:0.4948,
+   sorten:[
+     {name:"Callet",             offiziell:1200, fehlstoecke:0},
+     {name:"Manto Negro",        offiziell:1274, fehlstoecke:0}
+   ]},
+  {id:"wb8", eigentumer:"Daniel Hasenfratz",  ort:"Alcúdia",               ha:0.5812,
+   sorten:[
+     {name:"Cabernet Sauvignon", offiziell:1500, fehlstoecke:0},
+     {name:"Merlot",             offiziell:1406, fehlstoecke:0}
+   ]},
+  {id:"wb9", eigentumer:"Timm Nissen",        ort:"Sta. Margalida",        ha:1.0,
+   sorten:[
+     {name:"Manto Negro",        offiziell:2500, fehlstoecke:0},
+     {name:"Callet",             offiziell:2500, fehlstoecke:0}
+   ]}
+];
+
+let FL_DATA = FL_WEINBERGE_DEFAULT.map(w=>({...w, sorten:w.sorten.map(s=>({...s}))}));
+
+async function flLoad(){
+  try{
+    const r = await storage.get(FL_KEY);
+    if(r && r.value){
+      const saved = JSON.parse(r.value);
+      // Merge saved fehlstoecke into default structure (adds new sorten safely)
+      FL_DATA = FL_WEINBERGE_DEFAULT.map(wb=>{
+        const savedWb = saved.find(x=>x.id===wb.id);
+        return {...wb, sorten: wb.sorten.map(s=>{
+          const savedS = savedWb && savedWb.sorten && savedWb.sorten.find(x=>x.name===s.name);
+          return savedS ? {...s, fehlstoecke: savedS.fehlstoecke||0} : {...s};
+        })};
+      });
+    }
+  }catch(e){}
+  flRender();
+}
+
+async function flSave(wbId){
+  const btn = document.getElementById('fl-save-'+wbId);
+  const ok  = document.getElementById('fl-ok-'+wbId);
+  if(btn){ btn.disabled=true; btn.textContent='Speichern…'; }
+
+  // Read current inputs for this Weinberg
+  const wb = FL_DATA.find(x=>x.id===wbId);
+  wb.sorten.forEach(s=>{
+    const inp = document.getElementById(`fl-inp-${wbId}-${s.name.replace(/\s+/g,'-')}`);
+    if(inp) s.fehlstoecke = parseInt(inp.value)||0;
+  });
+
+  try{
+    await storage.set(FL_KEY, JSON.stringify(FL_DATA));
+    if(ok){ ok.style.opacity='1'; setTimeout(()=>ok.style.opacity='0',2000); }
+  }catch(e){ alert('Fehler beim Speichern: '+e.message); }
+  if(btn){ btn.disabled=false; btn.textContent='Speichern'; }
+
+  // Update overview table
+  flRenderOverview();
+}
+
+function flGetAktiv(wb){ return wb.sorten.reduce((s,x)=>s+((x.offiziell||0)-(x.fehlstoecke||0)),0); }
+function flGetOffiziell(wb){ return wb.sorten.reduce((s,x)=>s+(x.offiziell||0),0); }
+function flGetFehlstoecke(wb){ return wb.sorten.reduce((s,x)=>s+(x.fehlstoecke||0),0); }
+
+function flRenderOverview(){
+  const tbody = document.getElementById('fl-ov-tbody');
+  if(!tbody) return;
+  let totalHa=0, totalOff=0, totalFeh=0, totalAkt=0;
+  tbody.innerHTML = FL_DATA.map(wb=>{
+    const off=flGetOffiziell(wb), feh=flGetFehlstoecke(wb), akt=off-feh;
+    totalHa+=wb.ha; totalOff+=off; totalFeh+=feh; totalAkt+=akt;
+    return `<tr>
+      <td>${wb.eigentumer}</td>
+      <td>${wb.ort}</td>
+      <td>${wb.ha.toLocaleString('de-DE')}</td>
+      <td>${off.toLocaleString('de-DE')}</td>
+      <td${feh>0?' style="color:#8B2500;font-weight:600"':''}>${feh.toLocaleString('de-DE')}</td>
+      <td style="font-weight:600;color:#2C5038">${akt.toLocaleString('de-DE')}</td>
+    </tr>`;
+  }).join('')
+  + `<tr>
+    <td colspan="2">GESAMT</td>
+    <td>${totalHa.toFixed(4)}</td>
+    <td>${totalOff.toLocaleString('de-DE')}</td>
+    <td${totalFeh>0?' style="color:#8B2500"':''}>${totalFeh.toLocaleString('de-DE')}</td>
+    <td style="color:#2C5038">${totalAkt.toLocaleString('de-DE')}</td>
+  </tr>`;
+}
+
+function flRenderDetail(){
+  const container = document.getElementById('fl-weinberge-detail');
+  if(!container) return;
+  container.innerHTML = FL_DATA.map(wb=>{
+    const off=flGetOffiziell(wb), feh=flGetFehlstoecke(wb), akt=off-feh;
+    const rows = wb.sorten.map(s=>{
+      const safeName = s.name.replace(/\s+/g,'-');
+      const aktiv = (s.offiziell||0)-(s.fehlstoecke||0);
+      return `<tr>
+        <td>${s.name}</td>
+        <td style="text-align:right">${(s.offiziell||0).toLocaleString('de-DE')}</td>
+        <td style="text-align:center">
+          <input type="number" min="0" max="${s.offiziell||9999}"
+            id="fl-inp-${wb.id}-${safeName}"
+            value="${s.fehlstoecke||0}"
+            style="width:70px;padding:4px 6px;border:1px solid #ddd;border-radius:5px;font-size:12.5px;text-align:right">
+        </td>
+        <td style="text-align:right;font-weight:600;color:${aktiv<s.offiziell?'#8B2500':'#2C5038'}">
+          ${aktiv.toLocaleString('de-DE')}
+        </td>
+      </tr>`;
+    }).join('');
+    return `<div class="fl-card">
+      <p class="fl-h">🌿 ${wb.ort} – ${wb.eigentumer.split(' ').pop()}</p>
+      <div class="fl-meta">
+        <span class="fl-badge">${wb.eigentumer}</span>
+        <span class="fl-badge">${wb.ha.toLocaleString('de-DE')} ha</span>
+        <span class="fl-badge">${off.toLocaleString('de-DE')} Reben offiziell</span>
+        ${feh>0?`<span class="fl-badge r">${feh.toLocaleString('de-DE')} Fehlstöcke</span>`:''}
+        <span class="fl-badge g">${akt.toLocaleString('de-DE')} aktiv</span>
+      </div>
+      <table class="fl-sortentab">
+        <thead><tr>
+          <th>Rebsorte</th>
+          <th style="text-align:right">Offiziell</th>
+          <th style="text-align:center">Fehlstöcke ✎</th>
+          <th style="text-align:right">Aktiv</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
+        <button class="fl-save-btn" id="fl-save-${wb.id}" onclick="flSave('${wb.id}')">Speichern</button>
+        <span class="fl-save-ok" id="fl-ok-${wb.id}">✓ Gespeichert</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function flRender(){
+  flRenderOverview();
+  flRenderDetail();
+}
+
+// Tab switching
 (function(){
   const bar = document.getElementById('sz-tabbar');
   if(!bar) return;
@@ -914,38 +915,33 @@ window.szSwitchTab = szSwitchTab3;
   btn.id = 'sz-tab-flaechen';
   btn.textContent = 'Flächen';
   btn.onclick = function(){ flSwitchTab(); };
-  // Insert before Kellerverwaltung button
   const kvBtn = document.getElementById('sz-tab-kellerverwaltung');
-  if(kvBtn) bar.insertBefore(btn, kvBtn);
-  else bar.appendChild(btn);
+  if(kvBtn) bar.insertBefore(btn, kvBtn); else bar.appendChild(btn);
 })();
 
 function flSwitchTab(){
-  // Hide all other tabs
-  document.getElementById('root').style.display = 'none';
+  document.getElementById('root').style.display='none';
   document.getElementById('szuret-root').classList.remove('on');
-  const kvRoot = document.getElementById('kellerverwaltung-root');
-  if(kvRoot) kvRoot.classList.remove('on');
+  const kv=document.getElementById('kellerverwaltung-root'); if(kv) kv.classList.remove('on');
+  const fa=document.getElementById('fh-admin-root'); if(fa) fa.classList.remove('on');
   ['sz-tab-arbeit','sz-tab-weinlese','sz-tab-kellerverwaltung','sz-tab-admin'].forEach(id=>{
-    const e = document.getElementById(id); if(e) e.classList.remove('on');
+    const e=document.getElementById(id); if(e) e.classList.remove('on');
   });
-  // Show Flächen
   document.getElementById('flaechen-root').classList.add('on');
-  const btn = document.getElementById('sz-tab-flaechen');
-  if(btn) btn.classList.add('on');
+  const b=document.getElementById('sz-tab-flaechen'); if(b) b.classList.add('on');
 }
 
 // Override szSwitchTab to also hide flaechen-root
 const _flOrigSwitch = window.szSwitchTab;
 window.szSwitchTab = function(t){
-  const flRoot = document.getElementById('flaechen-root');
-  if(flRoot) flRoot.classList.remove('on');
-  const flBtn = document.getElementById('sz-tab-flaechen');
-  if(flBtn) flBtn.classList.remove('on');
+  const r=document.getElementById('flaechen-root'); if(r) r.classList.remove('on');
+  const b=document.getElementById('sz-tab-flaechen'); if(b) b.classList.remove('on');
   _flOrigSwitch(t);
 };
-</script>
 
+// Init
+(async function flInit(){ await flLoad(); })();
+</script>
 
 <!-- BENUTZERVERWALTUNG MIT PIN – Mallorca Weinberg App -->
 <style>
@@ -1041,7 +1037,10 @@ function fhApplySession(id, nev, jogok){
   document.getElementById('fh-badge').style.display = 'block';
   document.getElementById('fh-badge').innerHTML = `${nev} — ${fhJogokLabel(jogok)} &nbsp;·&nbsp; <span onclick="fhLogout()" style="text-decoration:underline;cursor:pointer">Abmelden</span>`;
   fhUpdateTabVisibility();
-  if(typeof szRender==='function') szRender();
+  // Show initial tab based on permissions
+  const j2 = window.__jogok||{};
+  if(j2.szolo||j2.teljes||j2.admin||j2.megtekint){ szSwitchTab('arbeit'); }
+  else if(j2.borasz){ szSwitchTab('weinlese'); }
 }
 function fhJogokLabel(j){
   if(j.admin) return 'Admin';
@@ -1063,8 +1062,10 @@ function fhUpdateTabVisibility(){
   const canMunka = j.szolo||j.teljes||j.admin||j.megtekint;
   const canSzuret = j.szolo||j.borasz||j.teljes||j.admin||j.megtekint;
   const canBorasz = j.borasz||j.teljes||j.admin||j.megtekint;
+  const flTab = document.getElementById('sz-tab-flaechen');
   if(munkaTab) munkaTab.style.display = canMunka ? '' : 'none';
   if(szTab) szTab.style.display = canSzuret ? '' : 'none';
+  if(flTab) flTab.style.display = (canMunka||canSzuret) ? '' : 'none';
   if(pkTab) pkTab.style.display = canBorasz ? '' : 'none';
   // ha a Munka fül el van rejtve, ne induljon rajta a nézet
   if(!canMunka && canSzuret){ szSwitchTab('weinlese'); }
