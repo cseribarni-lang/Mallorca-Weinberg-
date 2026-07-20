@@ -28,6 +28,7 @@
     <button id="et-tab-arbeit" onclick="etSwitchTab('arbeit')" style="flex:1;padding:10px 4px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:700;color:#5C7A2E;border-top:3px solid #5C7A2E">📋 Arbeit</button>
     <button id="et-tab-ernte" onclick="etSwitchTab('ernte')" style="flex:1;padding:10px 4px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:400;color:#4A4A4A;border-top:3px solid transparent">🍇 Ernte</button>
     <button id="et-tab-keller" onclick="etSwitchTab('keller')" style="flex:1;padding:10px 4px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:400;color:#4A4A4A;border-top:3px solid transparent">🍷 Keller</button>
+    <button id="et-tab-nutzer" onclick="etSwitchTab('nutzer')" style="display:none;flex:1;padding:10px 4px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:400;color:#4A4A4A;border-top:3px solid transparent">👤 Nutzer</button>
   </div>
 </div>
 
@@ -55,6 +56,20 @@
 </div>
 
 <div id="keller-root" style="display:none"></div>
+
+<div id="nutzer-root" style="display:none;min-height:100vh;background:#F5F0E8;font-family:system-ui,-apple-system,sans-serif;max-width:480px;margin:0 auto;padding-bottom:94px">
+  <div style="background:#2C1810;padding:13px 16px 9px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.35)">
+    <div style="font-size:10px;color:#B8D485;letter-spacing:2px;text-transform:uppercase;margin-bottom:1px">Mallorca · Weingut</div>
+    <div style="font-size:18px;font-weight:700;color:#fff;font-family:Georgia,serif;line-height:1.1">Nutzer verwalten</div>
+  </div>
+  <div style="padding:14px">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button onclick="nzNeueForm()" style="background:#5C7A2E;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer">+ Neuer Nutzer</button>
+    </div>
+    <div id="nz-liste"></div>
+    <div id="nz-form-wrap"></div>
+  </div>
+</div>
 
 <!-- ROLE GATE v4 – PIN-kódos -->
 <style>
@@ -179,6 +194,7 @@ async function rg4CheckPin(){
 function rg4Anmelden(u){
   localStorage.setItem(RG4_SESSION_KEY, JSON.stringify({id:u.id, nev:u.nev, eigentuemer:!!u.eigentuemer}));
   window.__workerMode = !u.eigentuemer;
+  window.__mwCurrentUser = {id:u.id, nev:u.nev, eigentuemer:!!u.eigentuemer};
   document.getElementById('rg4').classList.add('off');
   document.getElementById('rg4badge-name').textContent = u.nev + (u.eigentuemer ? ' (Eigentümer)' : ' (Mitarbeiter)');
   document.getElementById('rg4badge').style.display='block';
@@ -322,6 +338,7 @@ function etSwitchTab(t){
   document.getElementById('root').style.display = t==='arbeit' ? '' : 'none';
   document.getElementById('ernte-root').style.display = t==='ernte' ? '' : 'none';
   document.getElementById('keller-root').style.display = t==='keller' ? '' : 'none';
+  document.getElementById('nutzer-root').style.display = t==='nutzer' ? '' : 'none';
   document.getElementById('et-tab-arbeit').style.color = t==='arbeit' ? '#5C7A2E' : '#4A4A4A';
   document.getElementById('et-tab-arbeit').style.fontWeight = t==='arbeit' ? '700' : '400';
   document.getElementById('et-tab-arbeit').style.borderTopColor = t==='arbeit' ? '#5C7A2E' : 'transparent';
@@ -331,7 +348,149 @@ function etSwitchTab(t){
   document.getElementById('et-tab-keller').style.color = t==='keller' ? '#5C7A2E' : '#4A4A4A';
   document.getElementById('et-tab-keller').style.fontWeight = t==='keller' ? '700' : '400';
   document.getElementById('et-tab-keller').style.borderTopColor = t==='keller' ? '#5C7A2E' : 'transparent';
+  document.getElementById('et-tab-nutzer').style.color = t==='nutzer' ? '#5C7A2E' : '#4A4A4A';
+  document.getElementById('et-tab-nutzer').style.fontWeight = t==='nutzer' ? '700' : '400';
+  document.getElementById('et-tab-nutzer').style.borderTopColor = t==='nutzer' ? '#5C7A2E' : 'transparent';
   if(t==='ernte') etRender();
+  if(t==='nutzer') nzRender();
+}
+
+function etOnLogin(u){
+  document.getElementById('et-tab-nutzer').style.display = u.eigentuemer ? '' : 'none';
+}
+
+// ---------- Nutzer verwalten ----------
+async function nzListeLaden(){
+  try{
+    const r = await fetch(RG4_SB_URL+'/rest/v1/mallorca_felhasznalok?select=id,nev,eigentuemer&order=nev.asc', {headers: RG4_SB_H, signal: AbortSignal.timeout(6000)});
+    if(!r.ok) return [];
+    return await r.json();
+  }catch(e){ return []; }
+}
+
+async function nzRender(){
+  const liste = await nzListeLaden();
+  const el = document.getElementById('nz-liste');
+  if(liste.length===0){
+    el.innerHTML = '<p style="text-align:center;color:#888;font-size:13px;padding:20px 0">Noch keine Nutzer.</p>';
+    return;
+  }
+  el.innerHTML = liste.map(u=>`
+    <div style="background:#fff;border:1px solid #DDD5C0;border-radius:12px;padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div>
+          <div style="font-weight:700;font-size:14px">${u.nev}</div>
+          <div style="font-size:11.5px;color:#888">${u.eigentuemer ? 'Eigentümer' : 'Mitarbeiter'}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button onclick="nzBearbeitenForm('${u.id}','${u.nev.replace(/'/g,"\\'")}',${u.eigentuemer})" style="font-size:12px;padding:6px 10px;border:1px solid #DDD5C0;border-radius:7px;background:#fff;cursor:pointer">✏️ Bearbeiten</button>
+        <button onclick="nzPinForm('${u.id}','${u.nev.replace(/'/g,"\\'")}')" style="font-size:12px;padding:6px 10px;border:1px solid #DDD5C0;border-radius:7px;background:#fff;cursor:pointer">🔑 PIN zurücksetzen</button>
+        <button onclick="nzLoeschen('${u.id}','${u.nev.replace(/'/g,"\\'")}')" style="font-size:12px;padding:6px 10px;border:1px solid #8B2500;border-radius:7px;background:#fff;color:#8B2500;cursor:pointer">🗑 Löschen</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function nzFormWrapSchliessen(){ document.getElementById('nz-form-wrap').innerHTML=''; }
+
+function nzNeueForm(){
+  document.getElementById('nz-form-wrap').innerHTML = `
+    <div style="border:1px dashed #B8D485;border-radius:12px;padding:14px;margin-top:6px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:#5C7A2E">Neuer Nutzer</div>
+      <input type="text" id="nz-neu-nev" placeholder="Name" style="width:100%;padding:9px 11px;border:1px solid #DDD5C0;border-radius:8px;font-size:14px;margin-bottom:8px;box-sizing:border-box">
+      <input type="password" inputmode="numeric" maxlength="4" id="nz-neu-pin" placeholder="4-stelliger PIN" style="width:100%;padding:9px 11px;border:1px solid #DDD5C0;border-radius:8px;font-size:14px;margin-bottom:8px;box-sizing:border-box;letter-spacing:6px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px;color:#4A4A4A">
+        <input type="checkbox" id="nz-neu-eigentuemer" style="width:16px;height:16px">
+        <label for="nz-neu-eigentuemer">Eigentümer (Vollzugriff inkl. Preise)</label>
+      </div>
+      <div id="nz-neu-err" style="color:#8B2500;font-size:12px;margin-bottom:8px;display:none"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="nzNeueSpeichern()" style="flex:1;padding:10px 0;background:#5C7A2E;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:13.5px;cursor:pointer">✓ Anlegen</button>
+        <button onclick="nzFormWrapSchliessen()" style="padding:10px 16px;background:none;border:1px solid #DDD5C0;border-radius:8px;color:#4A4A4A;cursor:pointer">Abbrechen</button>
+      </div>
+    </div>
+  `;
+}
+
+async function nzNeueSpeichern(){
+  const nev = document.getElementById('nz-neu-nev').value.trim();
+  const pin = document.getElementById('nz-neu-pin').value.trim();
+  const eigentuemer = document.getElementById('nz-neu-eigentuemer').checked;
+  const errEl = document.getElementById('nz-neu-err');
+  if(!nev){ errEl.textContent='Bitte einen Namen eingeben.'; errEl.style.display='block'; return; }
+  if(!/^\d{4}$/.test(pin)){ errEl.textContent='Der PIN muss genau 4 Ziffern haben.'; errEl.style.display='block'; return; }
+  try{
+    const r = await fetch(RG4_SB_URL+'/rest/v1/mallorca_felhasznalok', {method:'POST', headers: RG4_SB_H, body: JSON.stringify({nev, pin, eigentuemer}), signal: AbortSignal.timeout(6000)});
+    if(!r.ok){ errEl.textContent='Fehler beim Speichern.'; errEl.style.display='block'; return; }
+    nzFormWrapSchliessen();
+    nzRender();
+  }catch(e){ errEl.textContent='Fehler beim Speichern.'; errEl.style.display='block'; }
+}
+
+function nzBearbeitenForm(id, nev, eigentuemer){
+  document.getElementById('nz-form-wrap').innerHTML = `
+    <div style="border:1px dashed #B8D485;border-radius:12px;padding:14px;margin-top:6px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:#5C7A2E">Nutzer bearbeiten</div>
+      <input type="text" id="nz-edit-nev" value="${nev.replace(/"/g,'&quot;')}" style="width:100%;padding:9px 11px;border:1px solid #DDD5C0;border-radius:8px;font-size:14px;margin-bottom:8px;box-sizing:border-box">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px;color:#4A4A4A">
+        <input type="checkbox" id="nz-edit-eigentuemer" ${eigentuemer?'checked':''} style="width:16px;height:16px">
+        <label for="nz-edit-eigentuemer">Eigentümer (Vollzugriff inkl. Preise)</label>
+      </div>
+      <div id="nz-edit-err" style="color:#8B2500;font-size:12px;margin-bottom:8px;display:none"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="nzBearbeitenSpeichern('${id}')" style="flex:1;padding:10px 0;background:#5C7A2E;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:13.5px;cursor:pointer">✓ Speichern</button>
+        <button onclick="nzFormWrapSchliessen()" style="padding:10px 16px;background:none;border:1px solid #DDD5C0;border-radius:8px;color:#4A4A4A;cursor:pointer">Abbrechen</button>
+      </div>
+    </div>
+  `;
+}
+
+async function nzBearbeitenSpeichern(id){
+  const nev = document.getElementById('nz-edit-nev').value.trim();
+  const eigentuemer = document.getElementById('nz-edit-eigentuemer').checked;
+  const errEl = document.getElementById('nz-edit-err');
+  if(!nev){ errEl.textContent='Bitte einen Namen eingeben.'; errEl.style.display='block'; return; }
+  try{
+    const r = await fetch(RG4_SB_URL+'/rest/v1/mallorca_felhasznalok?id=eq.'+id, {method:'PATCH', headers: RG4_SB_H, body: JSON.stringify({nev, eigentuemer}), signal: AbortSignal.timeout(6000)});
+    if(!r.ok){ errEl.textContent='Fehler beim Speichern.'; errEl.style.display='block'; return; }
+    nzFormWrapSchliessen();
+    nzRender();
+  }catch(e){ errEl.textContent='Fehler beim Speichern.'; errEl.style.display='block'; }
+}
+
+function nzPinForm(id, nev){
+  document.getElementById('nz-form-wrap').innerHTML = `
+    <div style="border:1px dashed #B8D485;border-radius:12px;padding:14px;margin-top:6px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:#5C7A2E">PIN zurücksetzen — ${nev}</div>
+      <input type="password" inputmode="numeric" maxlength="4" id="nz-pin-neu" placeholder="Neuer 4-stelliger PIN" style="width:100%;padding:9px 11px;border:1px solid #DDD5C0;border-radius:8px;font-size:14px;margin-bottom:8px;box-sizing:border-box;letter-spacing:6px">
+      <div id="nz-pin-err" style="color:#8B2500;font-size:12px;margin-bottom:8px;display:none"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="nzPinSpeichern('${id}')" style="flex:1;padding:10px 0;background:#5C7A2E;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:13.5px;cursor:pointer">✓ Speichern</button>
+        <button onclick="nzFormWrapSchliessen()" style="padding:10px 16px;background:none;border:1px solid #DDD5C0;border-radius:8px;color:#4A4A4A;cursor:pointer">Abbrechen</button>
+      </div>
+    </div>
+  `;
+}
+
+async function nzPinSpeichern(id){
+  const pin = document.getElementById('nz-pin-neu').value.trim();
+  const errEl = document.getElementById('nz-pin-err');
+  if(!/^\d{4}$/.test(pin)){ errEl.textContent='Der PIN muss genau 4 Ziffern haben.'; errEl.style.display='block'; return; }
+  try{
+    const r = await fetch(RG4_SB_URL+'/rest/v1/mallorca_felhasznalok?id=eq.'+id, {method:'PATCH', headers: RG4_SB_H, body: JSON.stringify({pin}), signal: AbortSignal.timeout(6000)});
+    if(!r.ok){ errEl.textContent='Fehler beim Speichern.'; errEl.style.display='block'; return; }
+    nzFormWrapSchliessen();
+    nzRender();
+  }catch(e){ errEl.textContent='Fehler beim Speichern.'; errEl.style.display='block'; }
+}
+
+async function nzLoeschen(id, nev){
+  if(!confirm('„'+nev+'" wirklich löschen?')) return;
+  try{
+    await fetch(RG4_SB_URL+'/rest/v1/mallorca_felhasznalok?id=eq.'+id, {method:'DELETE', headers: RG4_SB_H, signal: AbortSignal.timeout(6000)});
+    nzRender();
+  }catch(e){}
 }
 
 function etFmtKg(n){ return Number(n||0).toLocaleString('de-DE',{maximumFractionDigits:1}); }
@@ -676,7 +835,7 @@ function GefaessMuveletModal({muvelet, edenyek, tetelek, edenyTartalom, onClose,
 
 // ---------- Partien (Tételek) ----------
 
-function PartienView({tetelek, edenyek, edenyTartalom, stadiumok, kezelesek, kezeloanyagok, onReload, canEdit}){
+function PartienView({tetelek, edenyek, edenyTartalom, stadiumok, kezelesek, kezeloanyagok, analitikak, protokollok, tetelProtokollok, onReload, canEdit}){
   const [ujOffen, setUjOffen] = React.useState(false);
   const [ausgewaehlt, setAusgewaehlt] = React.useState(null);
 
@@ -686,7 +845,9 @@ function PartienView({tetelek, edenyek, edenyTartalom, stadiumok, kezelesek, kez
       edenyek, edenyTartalom,
       stadiumok: stadiumok.filter(s=>s.tetel_id===ausgewaehlt),
       kezelesek: kezelesek.filter(k=>k.tetel_id===ausgewaehlt),
-      kezeloanyagok,
+      analitikak: analitikak.filter(a=>a.tetel_id===ausgewaehlt),
+      kezeloanyagok, protokollok,
+      hozzarendelt: tetelProtokollok.filter(tp=>tp.tetel_id===ausgewaehlt),
       onBack: ()=>setAusgewaehlt(null),
       onReload, canEdit
     });
@@ -759,8 +920,10 @@ function UjPartieModal({onClose, onCreated}){
   );
 }
 
-function PartieDetail({tetel, edenyek, edenyTartalom, stadiumok, kezelesek, kezeloanyagok, onBack, onReload, canEdit}){
+function PartieDetail({tetel, edenyek, edenyTartalom, stadiumok, kezelesek, kezeloanyagok, analitikak, protokollok, hozzarendelt, onBack, onReload, canEdit}){
   const [ujKezelesOffen, setUjKezelesOffen] = React.useState(false);
+  const [ujAnalitikOffen, setUjAnalitikOffen] = React.useState(false);
+  const [protokollZuweisenOffen, setProtokollZuweisenOffen] = React.useState(false);
   const sortiert = [...stadiumok].sort((a,b)=>a.sorrend-b.sorrend);
   const inhalt = edenyTartalom.filter(et=>et.tetel_id===tetel.id);
 
@@ -772,6 +935,11 @@ function PartieDetail({tetel, edenyek, edenyTartalom, stadiumok, kezelesek, keze
     if(akt) await kbUpdate('mallorca_tetel_stadiumok', akt.id, {befejezve: jetzt});
     await kbUpdate('mallorca_tetel_stadiumok', next.id, {elkezdve: jetzt});
     await kbUpdate('mallorca_tetelek', tetel.id, {jelenlegi_stadium_sorrend: next.sorrend});
+    onReload();
+  };
+
+  const protokollEntfernen = async (id) => {
+    await kbDelete('mallorca_tetel_protokollok', id);
     onReload();
   };
 
@@ -807,6 +975,21 @@ function PartieDetail({tetel, edenyek, edenyTartalom, stadiumok, kezelesek, keze
 
     React.createElement('div', {style:kCard()},
       React.createElement('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}},
+        React.createElement('div', {style:{fontWeight:700,fontSize:13,color:kx.accent}}, 'Zugewiesenes Protokoll'),
+        canEdit && React.createElement('button', {onClick:()=>setProtokollZuweisenOffen(true), style:kBtnMini}, '+ Zuweisen')
+      ),
+      hozzarendelt.length===0 ? React.createElement('div', {style:{fontSize:12.5,color:kx.textLt}}, 'Kein Protokoll zugewiesen.') :
+      hozzarendelt.map(h=>{
+        const p = protokollok.find(x=>x.id===h.protokoll_id);
+        return React.createElement('div', {key:h.id, style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 0'}},
+          React.createElement('div', {style:{fontSize:13}}, p? p.nev : '—'),
+          canEdit && React.createElement('span', {onClick:()=>protokollEntfernen(h.id), style:{cursor:'pointer',color:kx.textLt,fontSize:13}}, '×')
+        );
+      })
+    ),
+
+    React.createElement('div', {style:kCard()},
+      React.createElement('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}},
         React.createElement('div', {style:{fontWeight:700,fontSize:13,color:kx.accent}}, 'Behandlungen'),
         canEdit && React.createElement('button', {onClick:()=>setUjKezelesOffen(true), style:kBtnMini}, '+ Neu')
       ),
@@ -823,7 +1006,88 @@ function PartieDetail({tetel, edenyek, edenyTartalom, stadiumok, kezelesek, keze
         );
       })
     ),
-    ujKezelesOffen && React.createElement(UjKezelesModal, {tetel, kezeloanyagok, stadiumok:sortiert, onClose:()=>setUjKezelesOffen(false), onCreated:()=>{onReload();setUjKezelesOffen(false);}})
+
+    React.createElement('div', {style:kCard()},
+      React.createElement('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}},
+        React.createElement('div', {style:{fontWeight:700,fontSize:13,color:kx.accent}}, 'Analytik'),
+        canEdit && React.createElement('button', {onClick:()=>setUjAnalitikOffen(true), style:kBtnMini}, '+ Neu')
+      ),
+      analitikak.length===0 ? React.createElement('div', {style:{fontSize:12.5,color:kx.textLt}}, 'Noch keine Messungen erfasst.') :
+      React.createElement('div', {style:{overflowX:'auto'}},
+        React.createElement('table', {style:{width:'100%',borderCollapse:'collapse',fontSize:11.5}},
+          React.createElement('thead', null, React.createElement('tr', {style:{borderBottom:`2px solid ${kx.border}`,textAlign:'left'}},
+            ['Datum','Zucker','pH','Säure','SO₂ frei','SO₂ ges.','Alkohol','Temp.'].map(h=>React.createElement('th',{key:h,style:{padding:'6px 7px',color:kx.textLt,fontWeight:600,whiteSpace:'nowrap'}},h))
+          )),
+          React.createElement('tbody', null, [...analitikak].sort((a,b)=>b.datum.localeCompare(a.datum)).map(a=>
+            React.createElement('tr', {key:a.id, style:{borderBottom:`1px solid ${kx.border}`}},
+              React.createElement('td',{style:{padding:'6px 7px'}}, a.datum),
+              React.createElement('td',{style:{padding:'6px 7px'}}, a.cukorfok??'—'),
+              React.createElement('td',{style:{padding:'6px 7px'}}, a.ph??'—'),
+              React.createElement('td',{style:{padding:'6px 7px'}}, a.sav??'—'),
+              React.createElement('td',{style:{padding:'6px 7px'}}, a.so2_szabad??'—'),
+              React.createElement('td',{style:{padding:'6px 7px'}}, a.so2_osszes??'—'),
+              React.createElement('td',{style:{padding:'6px 7px'}}, a.alkohol??'—'),
+              React.createElement('td',{style:{padding:'6px 7px'}}, a.homerseklet??'—')
+            )
+          ))
+        )
+      )
+    ),
+    ujKezelesOffen && React.createElement(UjKezelesModal, {tetel, kezeloanyagok, stadiumok:sortiert, onClose:()=>setUjKezelesOffen(false), onCreated:()=>{onReload();setUjKezelesOffen(false);}}),
+    ujAnalitikOffen && React.createElement(UjAnalitikModal, {tetel, onClose:()=>setUjAnalitikOffen(false), onCreated:()=>{onReload();setUjAnalitikOffen(false);}}),
+    protokollZuweisenOffen && React.createElement(ProtokollZuweisenModal, {tetel, protokollok, onClose:()=>setProtokollZuweisenOffen(false), onDone:()=>{onReload();setProtokollZuweisenOffen(false);}})
+  );
+}
+
+function UjAnalitikModal({tetel, onClose, onCreated}){
+  const [form, setForm] = React.useState({datum:new Date().toISOString().slice(0,10), cukorfok:'', ph:'', sav:'', so2_szabad:'', so2_osszes:'', alkohol:'', homerseklet:'', megjegyzes:''});
+  const [speichert, setSpeichert] = React.useState(false);
+  const numOrNull = v => v===''? null : parseFloat(v);
+  const submit = async () => {
+    setSpeichert(true);
+    await kbInsert('mallorca_analitikak', {
+      tetel_id: tetel.id, datum: form.datum,
+      cukorfok: numOrNull(form.cukorfok), ph: numOrNull(form.ph), sav: numOrNull(form.sav),
+      so2_szabad: numOrNull(form.so2_szabad), so2_osszes: numOrNull(form.so2_osszes),
+      alkohol: numOrNull(form.alkohol), homerseklet: numOrNull(form.homerseklet),
+      megjegyzes: form.megjegyzes||null
+    });
+    setSpeichert(false);
+    onCreated();
+  };
+  return React.createElement(KModalShell, {title:'Neue Messung', onClose},
+    React.createElement(KField, {label:'Datum'}, React.createElement('input', {type:'date', style:kInput(), value:form.datum, onChange:e=>setForm({...form,datum:e.target.value})})),
+    React.createElement('div', {style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}},
+      React.createElement(KField, {label:'Zucker (°Oe/Bx)'}, React.createElement('input', {type:'number', step:'any', style:kInput(), value:form.cukorfok, onChange:e=>setForm({...form,cukorfok:e.target.value})})),
+      React.createElement(KField, {label:'pH'}, React.createElement('input', {type:'number', step:'any', style:kInput(), value:form.ph, onChange:e=>setForm({...form,ph:e.target.value})})),
+      React.createElement(KField, {label:'Säure (g/l)'}, React.createElement('input', {type:'number', step:'any', style:kInput(), value:form.sav, onChange:e=>setForm({...form,sav:e.target.value})})),
+      React.createElement(KField, {label:'Temperatur (°C)'}, React.createElement('input', {type:'number', step:'any', style:kInput(), value:form.homerseklet, onChange:e=>setForm({...form,homerseklet:e.target.value})})),
+      React.createElement(KField, {label:'SO₂ frei (mg/l)'}, React.createElement('input', {type:'number', step:'any', style:kInput(), value:form.so2_szabad, onChange:e=>setForm({...form,so2_szabad:e.target.value})})),
+      React.createElement(KField, {label:'SO₂ gesamt (mg/l)'}, React.createElement('input', {type:'number', step:'any', style:kInput(), value:form.so2_osszes, onChange:e=>setForm({...form,so2_osszes:e.target.value})})),
+      React.createElement(KField, {label:'Alkohol (%)'}, React.createElement('input', {type:'number', step:'any', style:kInput(), value:form.alkohol, onChange:e=>setForm({...form,alkohol:e.target.value})}))
+    ),
+    React.createElement(KField, {label:'Bemerkung'}, React.createElement('textarea', {style:{...kInput(),minHeight:50}, value:form.megjegyzes, onChange:e=>setForm({...form,megjegyzes:e.target.value})})),
+    React.createElement('button', {onClick:submit, disabled:speichert, style:kBtn(speichert)}, speichert?'Speichern…':'Messung speichern')
+  );
+}
+
+function ProtokollZuweisenModal({tetel, protokollok, onClose, onDone}){
+  const [protokollId, setProtokollId] = React.useState('');
+  const [speichert, setSpeichert] = React.useState(false);
+  const submit = async () => {
+    if(!protokollId) return;
+    setSpeichert(true);
+    await kbInsert('mallorca_tetel_protokollok', {tetel_id: tetel.id, protokoll_id: protokollId});
+    setSpeichert(false);
+    onDone();
+  };
+  return React.createElement(KModalShell, {title:'Protokoll zuweisen', onClose},
+    protokollok.length===0 ? React.createElement('div', {style:{fontSize:13,color:kx.textMid,marginBottom:14}}, 'Noch keine Protokoll-Vorlagen vorhanden. Lege zuerst eine im Bereich „Protokolle" an.') :
+    React.createElement(KField, {label:'Protokoll-Vorlage'}, React.createElement('select', {style:kInput(), value:protokollId, onChange:e=>setProtokollId(e.target.value)},
+      React.createElement('option',{value:''}, '— wählen —'),
+      protokollok.map(p=>React.createElement('option', {key:p.id, value:p.id}, p.nev))
+    )),
+    protokollok.length>0 && React.createElement('button', {onClick:submit, disabled: speichert || !protokollId, style:kBtn(speichert || !protokollId)}, speichert?'Speichern…':'Zuweisen')
   );
 }
 
@@ -899,6 +1163,124 @@ function UjBehandlungsmittelModal({onClose, onCreated}){
   );
 }
 
+// ---------- Protokolle (Protokollok) ----------
+
+function ProtokolleView({protokollok, kezeloanyagok, onReload, canEdit}){
+  const [ujOffen, setUjOffen] = React.useState(false);
+  const [ausgewaehlt, setAusgewaehlt] = React.useState(null);
+
+  if(ausgewaehlt){
+    return React.createElement(ProtokollDetail, {
+      protokoll: protokollok.find(p=>p.id===ausgewaehlt), kezeloanyagok,
+      onBack: ()=>setAusgewaehlt(null), onReload, canEdit
+    });
+  }
+
+  return React.createElement('div', {style:{padding:'14px'}},
+    React.createElement('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}},
+      React.createElement('div', {style:{fontFamily:'Georgia,serif',fontSize:18,fontWeight:700,color:kx.accent}}, 'Protokolle'),
+      canEdit && React.createElement('button', {onClick:()=>setUjOffen(true), style:{...kBtnMini,background:kx.accent,color:'#fff',border:'none',padding:'8px 14px'}}, '+ Neu')
+    ),
+    protokollok.length===0 ? React.createElement(KLeeresState, {text:'Noch keine Protokoll-Vorlagen angelegt.'}) :
+    protokollok.map(p=>React.createElement('div', {key:p.id, onClick:()=>setAusgewaehlt(p.id), style:{...kCard(), cursor:'pointer'}},
+      React.createElement('div', {style:{fontWeight:700,fontSize:14}}, p.nev),
+      React.createElement('div', {style:{fontSize:12,color:kx.textLt,marginTop:2}}, `${p.fajta||''} · ${p.bortipus||''} · ${p.allapot||'Entwurf'}`)
+    )),
+    ujOffen && React.createElement(UjProtokollModal, {onClose:()=>setUjOffen(false), onCreated:(id)=>{onReload();setUjOffen(false);setAusgewaehlt(id);}})
+  );
+}
+
+function UjProtokollModal({onClose, onCreated}){
+  const [form, setForm] = React.useState({nev:'', fajta:'', bortipus:KB_BORFAJTAK[0]});
+  const [speichert, setSpeichert] = React.useState(false);
+  const submit = async () => {
+    if(!form.nev.trim()) return;
+    setSpeichert(true);
+    const created = await kbInsert('mallorca_protokollok', {nev:form.nev.trim(), fajta:form.fajta||null, bortipus:form.bortipus, allapot:'Entwurf'});
+    if(created && created[0]){
+      const stadien = KB_STADIEN_SABLON[form.bortipus] || [];
+      for(let i=0;i<stadien.length;i++){
+        await kbInsert('mallorca_protokoll_fazisok', {protokoll_id: created[0].id, nev: stadien[i], sorrend: i+1});
+      }
+    }
+    setSpeichert(false);
+    onCreated(created && created[0] ? created[0].id : null);
+  };
+  return React.createElement(KModalShell, {title:'Neues Protokoll', onClose},
+    React.createElement(KField, {label:'Name'}, React.createElement('input', {style:kInput(), placeholder:'z.B. Chardonnay Standard', value:form.nev, onChange:e=>setForm({...form,nev:e.target.value})})),
+    React.createElement(KField, {label:'Rebsorte (optional)'}, React.createElement('input', {style:kInput(), value:form.fajta, onChange:e=>setForm({...form,fajta:e.target.value})})),
+    React.createElement(KField, {label:'Weintyp (bestimmt die Phasen)'}, React.createElement('select', {style:kInput(), value:form.bortipus, onChange:e=>setForm({...form,bortipus:e.target.value})}, KB_BORFAJTAK.map(b=>React.createElement('option',{key:b,value:b},b)))),
+    React.createElement('button', {onClick:submit, disabled: speichert || !form.nev.trim(), style:kBtn(speichert || !form.nev.trim())}, speichert?'Speichern…':'Protokoll anlegen')
+  );
+}
+
+function ProtokollDetail({protokoll, kezeloanyagok, onBack, onReload, canEdit}){
+  const [fazisok, setFazisok] = React.useState([]);
+  const [kezelesekMap, setKezelesekMap] = React.useState({});
+  const [parameterekMap, setParameterekMap] = React.useState({});
+  const [geladen, setGeladen] = React.useState(false);
+
+  const load = async () => {
+    const fz = await kbSelect('mallorca_protokoll_fazisok', 'select=*&protokoll_id=eq.'+protokoll.id+'&order=sorrend.asc');
+    setFazisok(fz);
+    const kMap = {}, pMap = {};
+    for(const f of fz){
+      kMap[f.id] = await kbSelect('mallorca_protokoll_kezelesek', 'select=*&fazis_id=eq.'+f.id+'&order=sorrend.asc');
+      pMap[f.id] = await kbSelect('mallorca_protokoll_parameterek', 'select=*&fazis_id=eq.'+f.id+'&order=sorrend.asc');
+    }
+    setKezelesekMap(kMap); setParameterekMap(pMap);
+    setGeladen(true);
+  };
+  React.useEffect(()=>{ load(); }, [protokoll.id]);
+
+  const kezelesHozzaad = async (fazisId) => {
+    await kbInsert('mallorca_protokoll_kezelesek', {fazis_id: fazisId, mennyiseg:null, mertekegyseg:'g/hl', megjegyzes:'', sorrend: (kezelesekMap[fazisId]||[]).length});
+    load();
+  };
+  const kezelesFrissit = async (id, mezok) => { await kbUpdate('mallorca_protokoll_kezelesek', id, mezok); };
+  const kezelesTorol = async (id) => { await kbDelete('mallorca_protokoll_kezelesek', id); load(); };
+
+  const parameterHozzaad = async (fazisId) => {
+    await kbInsert('mallorca_protokoll_parameterek', {fazis_id: fazisId, nev:'', ertek:'', sorrend: (parameterekMap[fazisId]||[]).length});
+    load();
+  };
+  const parameterFrissit = async (id, mezok) => { await kbUpdate('mallorca_protokoll_parameterek', id, mezok); };
+  const parameterTorol = async (id) => { await kbDelete('mallorca_protokoll_parameterek', id); load(); };
+
+  if(!geladen){
+    return React.createElement('div', {style:{padding:'14px'}}, React.createElement('div', {onClick:onBack, style:{fontSize:12.5,color:kx.accent,cursor:'pointer'}}, '← Zurück'));
+  }
+
+  return React.createElement('div', {style:{padding:'14px'}},
+    React.createElement('div', {onClick:onBack, style:{fontSize:12.5,color:kx.accent,cursor:'pointer',marginBottom:10}}, '← Zurück zu Protokollen'),
+    React.createElement('div', {style:{fontFamily:'Georgia,serif',fontSize:19,fontWeight:700,color:kx.text,marginBottom:2}}, protokoll.nev),
+    React.createElement('div', {style:{fontSize:12.5,color:kx.textMid,marginBottom:14}}, `${protokoll.fajta||''} · ${protokoll.bortipus||''}`),
+    fazisok.map(f=>React.createElement('div', {key:f.id, style:kCard()},
+      React.createElement('div', {style:{fontWeight:700,fontSize:13.5,color:kx.accent,marginBottom:10}}, f.nev),
+
+      React.createElement('div', {style:{fontSize:11,fontWeight:700,color:kx.textLt,textTransform:'uppercase',letterSpacing:.5,marginBottom:6}}, 'Geplante Behandlungen'),
+      (kezelesekMap[f.id]||[]).map(k=>React.createElement('div', {key:k.id, style:{display:'flex',gap:6,marginBottom:6,alignItems:'center'}},
+        React.createElement('select', {value:k.kezeloanyag_id||'', onChange:e=>{kezelesFrissit(k.id,{kezeloanyag_id:e.target.value||null}); load();}, style:{...kInput(),flex:1,padding:'6px 8px',fontSize:12.5}},
+          React.createElement('option',{value:''}, '— Mittel —'),
+          kezeloanyagok.map(m=>React.createElement('option',{key:m.id,value:m.id}, m.nev))
+        ),
+        React.createElement('input', {type:'number', placeholder:'Menge', defaultValue:k.mennyiseg||'', onBlur:e=>kezelesFrissit(k.id,{mennyiseg: e.target.value? parseFloat(e.target.value): null}), style:{...kInput(),width:70,padding:'6px 7px',fontSize:12.5}}),
+        React.createElement('input', {placeholder:'Einh.', defaultValue:k.mertekegyseg||'', onBlur:e=>kezelesFrissit(k.id,{mertekegyseg:e.target.value}), style:{...kInput(),width:60,padding:'6px 7px',fontSize:12.5}}),
+        canEdit && React.createElement('span', {onClick:()=>kezelesTorol(k.id), style:{cursor:'pointer',color:kx.textLt,padding:'0 4px'}}, '×')
+      )),
+      canEdit && React.createElement('button', {onClick:()=>kezelesHozzaad(f.id), style:{...kBtnMini,fontSize:11.5,padding:'5px 9px',marginBottom:14}}, '+ Behandlung'),
+
+      React.createElement('div', {style:{fontSize:11,fontWeight:700,color:kx.textLt,textTransform:'uppercase',letterSpacing:.5,marginBottom:6}}, 'Zielparameter'),
+      (parameterekMap[f.id]||[]).map(p=>React.createElement('div', {key:p.id, style:{display:'flex',gap:6,marginBottom:6}},
+        React.createElement('input', {placeholder:'z.B. Zielzucker', defaultValue:p.nev||'', onBlur:e=>parameterFrissit(p.id,{nev:e.target.value}), style:{...kInput(),flex:1,padding:'6px 8px',fontSize:12.5}}),
+        React.createElement('input', {placeholder:'Wert', defaultValue:p.ertek||'', onBlur:e=>parameterFrissit(p.id,{ertek:e.target.value}), style:{...kInput(),width:100,padding:'6px 8px',fontSize:12.5}}),
+        canEdit && React.createElement('span', {onClick:()=>parameterTorol(p.id), style:{cursor:'pointer',color:kx.textLt,padding:'0 4px'}}, '×')
+      )),
+      canEdit && React.createElement('button', {onClick:()=>parameterHozzaad(f.id), style:{...kBtnMini,fontSize:11.5,padding:'5px 9px'}}, '+ Parameter')
+    ))
+  );
+}
+
 // ---------- Root ----------
 
 function KellerApp(){
@@ -909,19 +1291,57 @@ function KellerApp(){
   const [stadiumok, setStadiumok] = React.useState([]);
   const [kezelesek, setKezelesek] = React.useState([]);
   const [kezeloanyagok, setKezeloanyagok] = React.useState([]);
+  const [analitikak, setAnalitikak] = React.useState([]);
+  const [protokollok, setProtokollok] = React.useState([]);
+  const [tetelProtokollok, setTetelProtokollok] = React.useState([]);
   const [geladen, setGeladen] = React.useState(false);
   const [canEdit, setCanEdit] = React.useState(!window.__workerMode);
 
   const reload = async () => {
-    const [e, t, et, st, kz, km] = await Promise.all([
+    const [e, t, et, st, kz, km, an, pr, tp] = await Promise.all([
       kbSelect('mallorca_edenyek'), kbSelect('mallorca_tetelek'), kbSelect('mallorca_edeny_tartalom'),
-      kbSelect('mallorca_tetel_stadiumok'), kbSelect('mallorca_kezelesek'), kbSelect('mallorca_kezeloanyagok')
+      kbSelect('mallorca_tetel_stadiumok'), kbSelect('mallorca_kezelesek'), kbSelect('mallorca_kezeloanyagok'),
+      kbSelect('mallorca_analitikak'), kbSelect('mallorca_protokollok'), kbSelect('mallorca_tetel_protokollok')
     ]);
     setEdenyek(e); setTetelek(t); setEdenyTartalom(et); setStadiumok(st); setKezelesek(kz); setKezeloanyagok(km);
+    setAnalitikak(an); setProtokollok(pr); setTetelProtokollok(tp);
     setGeladen(true);
   };
 
   React.useEffect(()=>{ reload(); const iv = setInterval(()=>setCanEdit(!window.__workerMode), 1000); return ()=>clearInterval(iv); }, []);
+
+  const exportExcel = () => {
+    if(!window.XLSX){ alert('XLSX-Bibliothek nicht verfügbar. Seite neu laden.'); return; }
+    const wb = window.XLSX.utils.book_new();
+    const partienRows = [['Bezeichnung','Jahrgang','Rebsorte','Weintyp','Lage','Menge (kg)','Menge (l)','Status']];
+    tetelek.forEach(t=>partienRows.push([t.azonosito,t.evjarat,t.fajta,t.borfajta,t.dulo,t.mennyiseg_kg,t.mennyiseg_liter,t.allapot]));
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(partienRows), 'Partien');
+
+    const gefaesseRows = [['Bezeichnung','Typ','Kapazität (l)','Standort','Inhalt (Partie)','Menge (l)']];
+    edenyek.forEach(e=>{
+      const t = edenyTartalom.find(x=>x.edeny_id===e.id);
+      const tt = t ? tetelek.find(x=>x.id===t.tetel_id) : null;
+      gefaesseRows.push([e.nev, e.tipus, e.kapacitas_liter, e.helyszin, tt?tt.azonosito:'', t?t.mennyiseg_liter:'']);
+    });
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(gefaesseRows), 'Gefäße');
+
+    const behandlungenRows = [['Partie','Datum','Art','Mittel','Menge','Einheit','Ausgeführt von','Bemerkung']];
+    kezelesek.forEach(k=>{
+      const t = tetelek.find(x=>x.id===k.tetel_id);
+      const m = kezeloanyagok.find(x=>x.id===k.kezeloanyag_id);
+      behandlungenRows.push([t?t.azonosito:'', k.datum, k.tipus, m?m.nev:'', k.mennyiseg, k.mertekegyseg, k.vegezte, k.megjegyzes]);
+    });
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(behandlungenRows), 'Behandlungen');
+
+    const analitikRows = [['Partie','Datum','Zucker','pH','Säure','SO2 frei','SO2 gesamt','Alkohol','Temperatur','Bemerkung']];
+    analitikak.forEach(a=>{
+      const t = tetelek.find(x=>x.id===a.tetel_id);
+      analitikRows.push([t?t.azonosito:'', a.datum, a.cukorfok, a.ph, a.sav, a.so2_szabad, a.so2_osszes, a.alkohol, a.homerseklet, a.megjegyzes]);
+    });
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(analitikRows), 'Analytik');
+
+    window.XLSX.writeFile(wb, 'Kellerbuch_Mallorca_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  };
 
   if(!geladen){
     return React.createElement('div', {style:{display:'flex',alignItems:'center',justifyContent:'center',height:'60vh'}},
@@ -931,18 +1351,24 @@ function KellerApp(){
 
   return React.createElement('div', {style:{minHeight:'100vh',background:kx.bg,fontFamily:'system-ui,-apple-system,sans-serif',maxWidth:480,margin:'0 auto',paddingBottom:94}},
     React.createElement('div', {style:{background:kx.bgDark,padding:'13px 16px 9px',position:'sticky',top:0,zIndex:100,boxShadow:'0 2px 8px rgba(0,0,0,0.35)'}},
-      React.createElement('div', {style:{fontSize:10,color:kx.accentLt,letterSpacing:2,textTransform:'uppercase',marginBottom:1}}, 'Mallorca · Weingut'),
-      React.createElement('div', {style:{fontSize:18,fontWeight:700,color:'#fff',fontFamily:'Georgia,serif'}}, 'Kellerbuch')
+      React.createElement('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}},
+        React.createElement('div', null,
+          React.createElement('div', {style:{fontSize:10,color:kx.accentLt,letterSpacing:2,textTransform:'uppercase',marginBottom:1}}, 'Mallorca · Weingut'),
+          React.createElement('div', {style:{fontSize:18,fontWeight:700,color:'#fff',fontFamily:'Georgia,serif'}}, 'Kellerbuch')
+        ),
+        canEdit && React.createElement('button', {onClick:exportExcel, style:{background:'transparent',color:kx.accentLt,border:`1px solid ${kx.accentLt}`,borderRadius:6,padding:'6px 10px',fontSize:11,fontWeight:600,cursor:'pointer'}}, '⬇ Excel')
+      )
     ),
-    React.createElement('div', {style:{display:'flex',background:'#fff',borderBottom:`1px solid ${kx.border}`,position:'sticky',top:55,zIndex:99}},
-      [['partien','Partien'],['gefaesse','Gefäße'],['mittel','Behandlungsmittel']].map(([id,label])=>
-        React.createElement('button', {key:id, onClick:()=>setTab(id), style:{flex:1,padding:'10px 6px',border:'none',background:'none',cursor:'pointer',fontSize:12.5,fontWeight: tab===id?700:400,color: tab===id?kx.accent:kx.textMid,borderBottom: tab===id?`3px solid ${kx.accent}`:'3px solid transparent'}}, label)
+    React.createElement('div', {style:{display:'flex',background:'#fff',borderBottom:`1px solid ${kx.border}`,position:'sticky',top:55,zIndex:99,overflowX:'auto'}},
+      [['partien','Partien'],['gefaesse','Gefäße'],['mittel','Mittel'],['protokolle','Protokolle']].map(([id,label])=>
+        React.createElement('button', {key:id, onClick:()=>setTab(id), style:{flex:'0 0 auto',minWidth:80,padding:'10px 6px',border:'none',background:'none',cursor:'pointer',fontSize:12,fontWeight: tab===id?700:400,color: tab===id?kx.accent:kx.textMid,borderBottom: tab===id?`3px solid ${kx.accent}`:'3px solid transparent'}}, label)
       )
     ),
     !canEdit && React.createElement('div', {style:{background:kx.goldLt,color:kx.gold,fontSize:11.5,textAlign:'center',padding:'6px 10px'}}, 'Mitarbeiter-Ansicht — nur lesen'),
-    tab==='partien' && React.createElement(PartienView, {tetelek, edenyek, edenyTartalom, stadiumok, kezelesek, kezeloanyagok, onReload:reload, canEdit}),
+    tab==='partien' && React.createElement(PartienView, {tetelek, edenyek, edenyTartalom, stadiumok, kezelesek, kezeloanyagok, analitikak, protokollok, tetelProtokollok, onReload:reload, canEdit}),
     tab==='gefaesse' && React.createElement(GefaesseView, {edenyek, edenyTartalom, tetelek, onReload:reload, canEdit}),
-    tab==='mittel' && React.createElement(BehandlungsmittelView, {kezeloanyagok, onReload:reload, canEdit})
+    tab==='mittel' && React.createElement(BehandlungsmittelView, {kezeloanyagok, onReload:reload, canEdit}),
+    tab==='protokolle' && React.createElement(ProtokolleView, {protokollok, kezeloanyagok, onReload:reload, canEdit})
   );
 }
 
@@ -950,7 +1376,6 @@ const kellerRootEl = document.getElementById('keller-root');
 if(kellerRootEl){
   ReactDOM.createRoot(kellerRootEl).render(React.createElement(KellerApp));
 }
-
 </script>
 </body>
 </html>
