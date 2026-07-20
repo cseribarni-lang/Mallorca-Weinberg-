@@ -882,6 +882,8 @@ function fhSwitchToAdmin(){
   document.getElementById('root').style.display='none';
   document.getElementById('szuret-root').classList.remove('on');
   document.getElementById('pincekonyv-root').classList.remove('on');
+  const rfRootEl = document.getElementById('reife-root'); if(rfRootEl) rfRootEl.classList.remove('on');
+  const rfTabEl = document.getElementById('sz-tab-reife'); if(rfTabEl) rfTabEl.classList.remove('on');
   document.getElementById('fh-admin-root').classList.add('on');
   ['sz-tab-munka','sz-tab-szuret','sz-tab-pincekonyv','sz-tab-admin'].forEach(id=>{
     const e=document.getElementById(id); if(e) e.classList.toggle('on', id==='sz-tab-admin');
@@ -1460,7 +1462,8 @@ window.szSwitchTab = function(t){
     document.getElementById('root').style.display='none';
     document.getElementById('szuret-root').classList.remove('on');
     const pkRoot = document.getElementById('pincekonyv-root'); if(pkRoot) pkRoot.classList.remove('on');
-    ['sz-tab-munka','sz-tab-szuret','sz-tab-pincekonyv'].forEach(id=>{ const e=document.getElementById(id); if(e) e.classList.remove('on'); });
+    const admRoot2 = document.getElementById('fh-admin-root'); if(admRoot2) admRoot2.classList.remove('on');
+    ['sz-tab-munka','sz-tab-szuret','sz-tab-pincekonyv','sz-tab-admin'].forEach(id=>{ const e=document.getElementById(id); if(e) e.classList.remove('on'); });
     rfInit();
   } else {
     _szSwitchTabForReife(t);
