@@ -27,6 +27,7 @@
   <div style="display:flex;max-width:480px;margin:0 auto">
     <button id="et-tab-arbeit" onclick="etSwitchTab('arbeit')" style="flex:1;padding:10px 4px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:700;color:#5C7A2E;border-top:3px solid #5C7A2E">📋 Arbeit</button>
     <button id="et-tab-ernte" onclick="etSwitchTab('ernte')" style="flex:1;padding:10px 4px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:400;color:#4A4A4A;border-top:3px solid transparent">🍇 Ernte</button>
+    <button id="et-tab-keller" onclick="etSwitchTab('keller')" style="flex:1;padding:10px 4px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:400;color:#4A4A4A;border-top:3px solid transparent">🍷 Keller</button>
   </div>
 </div>
 
@@ -52,6 +53,8 @@
     <div style="font-size:11px;color:#888;text-align:center;padding:6px 0 16px">Daten aus dem Tagebuch (Handarbeit → Weinlese). Neue Einträge bitte weiterhin im Tagebuch erfassen.</div>
   </div>
 </div>
+
+<div id="keller-root" style="display:none"></div>
 
 <!-- ROLE GATE v4 – PIN-kódos -->
 <style>
@@ -318,12 +321,16 @@ react-dom/cjs/react-dom-client.production.js:
 function etSwitchTab(t){
   document.getElementById('root').style.display = t==='arbeit' ? '' : 'none';
   document.getElementById('ernte-root').style.display = t==='ernte' ? '' : 'none';
+  document.getElementById('keller-root').style.display = t==='keller' ? '' : 'none';
   document.getElementById('et-tab-arbeit').style.color = t==='arbeit' ? '#5C7A2E' : '#4A4A4A';
   document.getElementById('et-tab-arbeit').style.fontWeight = t==='arbeit' ? '700' : '400';
   document.getElementById('et-tab-arbeit').style.borderTopColor = t==='arbeit' ? '#5C7A2E' : 'transparent';
   document.getElementById('et-tab-ernte').style.color = t==='ernte' ? '#5C7A2E' : '#4A4A4A';
   document.getElementById('et-tab-ernte').style.fontWeight = t==='ernte' ? '700' : '400';
   document.getElementById('et-tab-ernte').style.borderTopColor = t==='ernte' ? '#5C7A2E' : 'transparent';
+  document.getElementById('et-tab-keller').style.color = t==='keller' ? '#5C7A2E' : '#4A4A4A';
+  document.getElementById('et-tab-keller').style.fontWeight = t==='keller' ? '700' : '400';
+  document.getElementById('et-tab-keller').style.borderTopColor = t==='keller' ? '#5C7A2E' : 'transparent';
   if(t==='ernte') etRender();
 }
 
@@ -402,6 +409,548 @@ async function etRender(){
 }
 
 etSwitchTab('arbeit');
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script>
+// ============ Keller-Modul (Pincekönyv port) — Mallorca Weinberg ============
+const KB_SB_URL = 'https://tbigqmtirjaukhxwmqhw.supabase.co';
+const KB_SB_KEY = 'sb_publishable_6UD_aMtMYZxsHd5wXUmthw_UodjS_yH';
+const KB_SB_H = {'apikey': KB_SB_KEY, 'Authorization': 'Bearer '+KB_SB_KEY, 'Content-Type': 'application/json'};
+
+async function kbSelect(tabla, query){
+  try{
+    const r = await fetch(KB_SB_URL+'/rest/v1/'+tabla+'?'+(query||'select=*'), {headers: KB_SB_H, signal: AbortSignal.timeout(8000)});
+    if(!r.ok) return [];
+    return await r.json();
+  }catch(e){ return []; }
+}
+async function kbInsert(tabla, mezok){
+  try{
+    const r = await fetch(KB_SB_URL+'/rest/v1/'+tabla, {method:'POST', headers:{...KB_SB_H,'Prefer':'return=representation'}, body: JSON.stringify(mezok), signal: AbortSignal.timeout(8000)});
+    if(!r.ok) return null;
+    return await r.json();
+  }catch(e){ return null; }
+}
+async function kbUpdate(tabla, id, mezok){
+  try{
+    const r = await fetch(KB_SB_URL+'/rest/v1/'+tabla+'?id=eq.'+id, {method:'PATCH', headers: KB_SB_H, body: JSON.stringify(mezok), signal: AbortSignal.timeout(8000)});
+    return r.ok;
+  }catch(e){ return false; }
+}
+async function kbDelete(tabla, id){
+  try{
+    const r = await fetch(KB_SB_URL+'/rest/v1/'+tabla+'?id=eq.'+id, {method:'DELETE', headers: KB_SB_H, signal: AbortSignal.timeout(8000)});
+    return r.ok;
+  }catch(e){ return false; }
+}
+
+const KB_STADIEN_SABLON = {
+  'Weißwein': ['Lese','Pressen','Gärung','Ausbau','Abfüllung'],
+  'Rotwein': ['Lese','Maischegärung','Pressen','Ausbau','Abfüllung'],
+  'Rosé': ['Lese','Pressen','Gärung','Ausbau','Abfüllung']
+};
+const KB_BORFAJTAK = Object.keys(KB_STADIEN_SABLON);
+
+const kx = {
+  bg:'#F5F0E8', bgDark:'#2C1810', accent:'#5C7A2E', accentLt:'#B8D485', gold:'#C17D2B', goldLt:'#FDF3DC',
+  red:'#8B2500', text:'#1C1C1C', textMid:'#4A4A4A', textLt:'#888', border:'#DDD5C0', tag:'#EAF0DC'
+};
+const kInput = (o={}) => ({width:'100%',padding:'9px 11px',border:`1px solid ${kx.border}`,borderRadius:8,fontSize:14,background:'#fff',color:kx.text,boxSizing:'border-box',...o});
+const kLabel = {display:'block',fontSize:11,fontWeight:600,color:kx.textLt,marginBottom:4,textTransform:'uppercase',letterSpacing:.5};
+const kCard = (o={}) => ({background:'#fff',borderRadius:14,padding:16,marginBottom:10,border:`1px solid ${kx.border}`,...o});
+const kBtn = (disabled) => ({width:'100%',padding:'11px 0',background: disabled? kx.textLt : kx.accent,color:'#fff',border:'none',borderRadius:10,fontWeight:700,fontSize:14,cursor: disabled?'default':'pointer'});
+const kBtnMini = {background:'transparent',border:`1px solid ${kx.border}`,borderRadius:6,padding:'6px 10px',fontSize:12.5,fontWeight:600,cursor:'pointer',color:kx.text};
+
+function KField({label, children}){
+  return React.createElement('div', {style:{marginBottom:12}},
+    React.createElement('label', {style:kLabel}, label),
+    children
+  );
+}
+
+function KModalShell({title, onClose, children}){
+  return React.createElement('div', {style:{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:9600,display:'flex',alignItems:'flex-end',justifyContent:'center'}, onClick:onClose},
+    React.createElement('div', {style:{background:'#fff',borderRadius:'18px 18px 0 0',padding:'22px 18px 34px',width:'100%',maxWidth:480,maxHeight:'88vh',overflowY:'auto'}, onClick:e=>e.stopPropagation()},
+      React.createElement('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}},
+        React.createElement('div', {style:{fontFamily:'Georgia,serif',fontSize:17,fontWeight:700,color:kx.accent}}, title),
+        React.createElement('span', {onClick:onClose, style:{cursor:'pointer',fontSize:20,color:kx.textLt,padding:'0 4px'}}, '×')
+      ),
+      children
+    )
+  );
+}
+
+function KLeeresState({text}){
+  return React.createElement('div', {style:{textAlign:'center',padding:'40px 0',color:kx.textLt}},
+    React.createElement('div', {style:{fontSize:38,marginBottom:10}}, '🍷'),
+    React.createElement('div', {style:{fontSize:13}}, text)
+  );
+}
+
+// ---------- Gefäße (Edények) ----------
+
+function GefaesseView({edenyek, edenyTartalom, tetelek, onReload, canEdit}){
+  const [ujOffen, setUjOffen] = React.useState(false);
+  const [bearb, setBearb] = React.useState(null);
+  const [muvelet, setMuvelet] = React.useState(null);
+
+  const tartalomVon = (edenyId) => edenyTartalom.find(t=>t.edeny_id===edenyId);
+
+  return React.createElement('div', {style:{padding:'14px'}},
+    React.createElement('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}},
+      React.createElement('div', {style:{fontFamily:'Georgia,serif',fontSize:18,fontWeight:700,color:kx.accent}}, 'Gefäße'),
+      canEdit && React.createElement('button', {onClick:()=>setUjOffen(true), style:{...kBtnMini,background:kx.accent,color:'#fff',border:'none',padding:'8px 14px'}}, '+ Neu')
+    ),
+    edenyek.length===0 ? React.createElement(KLeeresState, {text:'Noch keine Gefäße angelegt.'}) :
+    React.createElement('div', null, edenyek.map(e=>{
+      const t = tartalomVon(e.id);
+      const tetel = t ? tetelek.find(x=>x.id===t.tetel_id) : null;
+      const fuellstand = t && e.kapacitas_liter ? Math.round(t.mennyiseg_liter/e.kapacitas_liter*100) : null;
+      return React.createElement('div', {key:e.id, style:kCard({padding:0,overflow:'hidden'})},
+        React.createElement('div', {style:{padding:'12px 14px',background:'#FAFAF8',borderBottom:`1px solid ${kx.border}`,display:'flex',justifyContent:'space-between',alignItems:'center'}},
+          React.createElement('div', null,
+            React.createElement('div', {style:{fontWeight:700,fontSize:14}}, e.nev),
+            React.createElement('div', {style:{fontSize:11.5,color:kx.textLt}}, `${e.tipus||'—'} · ${e.kapacitas_liter||'—'} l${e.helyszin?' · '+e.helyszin:''}`)
+          ),
+          canEdit && React.createElement('span', {onClick:()=>setBearb(e), style:{cursor:'pointer',fontSize:13,color:kx.textLt}}, '✏️')
+        ),
+        React.createElement('div', {style:{padding:'12px 14px'}},
+          tetel ? React.createElement('div', null,
+            React.createElement('div', {style:{fontSize:13,fontWeight:600,color:kx.text,marginBottom:3}}, tetel.azonosito+' · '+(tetel.fajta||'')),
+            React.createElement('div', {style:{fontSize:12,color:kx.textLt,marginBottom:8}}, `${t.mennyiseg_liter} l${fuellstand!=null?' · '+fuellstand+'% gefüllt':''}`)
+          ) : React.createElement('div', {style:{fontSize:12.5,color:kx.textLt,marginBottom:8}}, 'Leer'),
+          canEdit && React.createElement('div', {style:{display:'flex',gap:6,flexWrap:'wrap'}},
+            !tetel && React.createElement('button', {onClick:()=>setMuvelet({tipus:'befuellen', edeny:e}), style:kBtnMini}, 'Befüllen'),
+            tetel && React.createElement('button', {onClick:()=>setMuvelet({tipus:'abstich', edeny:e, tartalom:t}), style:kBtnMini}, 'Abstich'),
+            tetel && React.createElement('button', {onClick:()=>setMuvelet({tipus:'aufteilen', edeny:e, tartalom:t}), style:kBtnMini}, 'Aufteilen'),
+            tetel && React.createElement('button', {onClick:()=>setMuvelet({tipus:'zusammenfuehren', edeny:e, tartalom:t}), style:kBtnMini}, 'Zusammenführen'),
+            tetel && React.createElement('button', {onClick:()=>setMuvelet({tipus:'verschneiden', edeny:e, tartalom:t}), style:kBtnMini}, 'Verschneiden'),
+            tetel && React.createElement('button', {onClick:()=>setMuvelet({tipus:'leeren', edeny:e, tartalom:t}), style:{...kBtnMini,color:kx.red}}, 'Leeren')
+          )
+        )
+      );
+    })),
+    ujOffen && React.createElement(UjGefaessModal, {onClose:()=>setUjOffen(false), onCreated:()=>{onReload();setUjOffen(false);}}),
+    bearb && React.createElement(GefaessBearbeitenModal, {edeny:bearb, onClose:()=>setBearb(null), onSaved:()=>{onReload();setBearb(null);}}),
+    muvelet && React.createElement(GefaessMuveletModal, {muvelet, edenyek, tetelek, edenyTartalom, onClose:()=>setMuvelet(null), onDone:()=>{onReload();setMuvelet(null);}})
+  );
+}
+
+function UjGefaessModal({onClose, onCreated}){
+  const [form, setForm] = React.useState({nev:'', tipus:'Edelstahl', kapacitas_liter:'', helyszin:'', megjegyzes:''});
+  const [speichert, setSpeichert] = React.useState(false);
+  const typen = ['Edelstahl','Beton','Holzfass','Kunststoff'];
+  const submit = async () => {
+    if(!form.nev || !form.kapacitas_liter) return;
+    setSpeichert(true);
+    await kbInsert('mallorca_edenyek', {nev:form.nev, tipus:form.tipus, kapacitas_liter:parseFloat(form.kapacitas_liter), helyszin:form.helyszin||null, megjegyzes:form.megjegyzes||null});
+    setSpeichert(false);
+    onCreated();
+  };
+  return React.createElement(KModalShell, {title:'Neues Gefäß', onClose},
+    React.createElement(KField, {label:'Bezeichnung'}, React.createElement('input', {style:kInput(), placeholder:'z.B. Edelstahltank 3', value:form.nev, onChange:e=>setForm({...form,nev:e.target.value})})),
+    React.createElement(KField, {label:'Typ'}, React.createElement('select', {style:kInput(), value:form.tipus, onChange:e=>setForm({...form,tipus:e.target.value})}, typen.map(t=>React.createElement('option',{key:t,value:t},t)))),
+    React.createElement(KField, {label:'Kapazität (Liter)'}, React.createElement('input', {type:'number', style:kInput(), value:form.kapacitas_liter, onChange:e=>setForm({...form,kapacitas_liter:e.target.value})})),
+    React.createElement(KField, {label:'Standort (optional)'}, React.createElement('input', {style:kInput(), value:form.helyszin, onChange:e=>setForm({...form,helyszin:e.target.value})})),
+    React.createElement(KField, {label:'Bemerkung (optional)'}, React.createElement('textarea', {style:{...kInput(),minHeight:50}, value:form.megjegyzes, onChange:e=>setForm({...form,megjegyzes:e.target.value})})),
+    React.createElement('button', {onClick:submit, disabled: speichert || !form.nev || !form.kapacitas_liter, style:kBtn(speichert || !form.nev || !form.kapacitas_liter)}, speichert?'Speichern…':'Gefäß anlegen')
+  );
+}
+
+function GefaessBearbeitenModal({edeny, onClose, onSaved}){
+  const [form, setForm] = React.useState({nev:edeny.nev, tipus:edeny.tipus||'Edelstahl', kapacitas_liter:String(edeny.kapacitas_liter||''), helyszin:edeny.helyszin||'', megjegyzes:edeny.megjegyzes||''});
+  const [speichert, setSpeichert] = React.useState(false);
+  const typen = ['Edelstahl','Beton','Holzfass','Kunststoff'];
+  const submit = async () => {
+    setSpeichert(true);
+    await kbUpdate('mallorca_edenyek', edeny.id, {nev:form.nev, tipus:form.tipus, kapacitas_liter:parseFloat(form.kapacitas_liter)||0, helyszin:form.helyszin||null, megjegyzes:form.megjegyzes||null});
+    setSpeichert(false);
+    onSaved();
+  };
+  return React.createElement(KModalShell, {title:'Gefäß bearbeiten', onClose},
+    React.createElement(KField, {label:'Bezeichnung'}, React.createElement('input', {style:kInput(), value:form.nev, onChange:e=>setForm({...form,nev:e.target.value})})),
+    React.createElement(KField, {label:'Typ'}, React.createElement('select', {style:kInput(), value:form.tipus, onChange:e=>setForm({...form,tipus:e.target.value})}, typen.map(t=>React.createElement('option',{key:t,value:t},t)))),
+    React.createElement(KField, {label:'Kapazität (Liter)'}, React.createElement('input', {type:'number', style:kInput(), value:form.kapacitas_liter, onChange:e=>setForm({...form,kapacitas_liter:e.target.value})})),
+    React.createElement(KField, {label:'Standort'}, React.createElement('input', {style:kInput(), value:form.helyszin, onChange:e=>setForm({...form,helyszin:e.target.value})})),
+    React.createElement(KField, {label:'Bemerkung'}, React.createElement('textarea', {style:{...kInput(),minHeight:50}, value:form.megjegyzes, onChange:e=>setForm({...form,megjegyzes:e.target.value})})),
+    React.createElement('button', {onClick:submit, disabled:speichert, style:kBtn(speichert)}, speichert?'Speichern…':'Änderungen speichern')
+  );
+}
+
+function GefaessMuveletModal({muvelet, edenyek, tetelek, edenyTartalom, onClose, onDone}){
+  const {tipus, edeny, tartalom} = muvelet;
+  const [speichert, setSpeichert] = React.useState(false);
+  const [tetelId, setTetelId] = React.useState('');
+  const [menge, setMenge] = React.useState('');
+  const [zielEdenyId, setZielEdenyId] = React.useState('');
+  const [quelle2EdenyId, setQuelle2EdenyId] = React.useState('');
+
+  const leereEdenyek = edenyek.filter(e=>e.id!==edeny.id && !edenyTartalom.find(t=>t.edeny_id===e.id));
+  const gefuellteEdenyek = edenyek.filter(e=>e.id!==edeny.id && edenyTartalom.find(t=>t.edeny_id===e.id));
+
+  const titel = {befuellen:'Befüllen', abstich:'Abstich', aufteilen:'Aufteilen', zusammenfuehren:'Zusammenführen', verschneiden:'Verschneiden', leeren:'Leeren'}[tipus];
+
+  const submit = async () => {
+    setSpeichert(true);
+    if(tipus==='befuellen'){
+      if(!tetelId || !menge) { setSpeichert(false); return; }
+      await kbInsert('mallorca_edeny_tartalom', {edeny_id:edeny.id, tetel_id:tetelId, mennyiseg_liter:parseFloat(menge)});
+      await kbInsert('mallorca_edeny_mozgasok', {tipus:'Befüllen', cel_edeny_id:edeny.id, tetel_id:tetelId, mennyiseg_liter:parseFloat(menge)});
+    } else if(tipus==='abstich'){
+      if(!zielEdenyId) { setSpeichert(false); return; }
+      const zielTart = edenyTartalom.find(t=>t.edeny_id===zielEdenyId);
+      if(!zielTart){
+        await kbInsert('mallorca_edeny_tartalom', {edeny_id:zielEdenyId, tetel_id:tartalom.tetel_id, mennyiseg_liter:tartalom.mennyiseg_liter});
+      }
+      await kbDelete('mallorca_edeny_tartalom', tartalom.id);
+      await kbInsert('mallorca_edeny_mozgasok', {tipus:'Abstich', forras_edeny_id:edeny.id, cel_edeny_id:zielEdenyId, tetel_id:tartalom.tetel_id, mennyiseg_liter:tartalom.mennyiseg_liter});
+    } else if(tipus==='aufteilen'){
+      if(!zielEdenyId || !menge || parseFloat(menge)>=tartalom.mennyiseg_liter){ setSpeichert(false); return; }
+      const uebrig = tartalom.mennyiseg_liter - parseFloat(menge);
+      await kbUpdate('mallorca_edeny_tartalom', tartalom.id, {mennyiseg_liter: uebrig});
+      await kbInsert('mallorca_edeny_tartalom', {edeny_id:zielEdenyId, tetel_id:tartalom.tetel_id, mennyiseg_liter:parseFloat(menge)});
+      await kbInsert('mallorca_edeny_mozgasok', {tipus:'Aufteilen', forras_edeny_id:edeny.id, cel_edeny_id:zielEdenyId, tetel_id:tartalom.tetel_id, mennyiseg_liter:parseFloat(menge)});
+    } else if(tipus==='zusammenfuehren'){
+      if(!quelle2EdenyId) { setSpeichert(false); return; }
+      const quelle2 = edenyTartalom.find(t=>t.edeny_id===quelle2EdenyId);
+      if(!quelle2 || quelle2.tetel_id!==tartalom.tetel_id) { setSpeichert(false); return; }
+      await kbUpdate('mallorca_edeny_tartalom', tartalom.id, {mennyiseg_liter: tartalom.mennyiseg_liter + quelle2.mennyiseg_liter});
+      await kbDelete('mallorca_edeny_tartalom', quelle2.id);
+      await kbInsert('mallorca_edeny_mozgasok', {tipus:'Zusammenführen', forras_edeny_id:quelle2EdenyId, cel_edeny_id:edeny.id, tetel_id:tartalom.tetel_id, mennyiseg_liter:quelle2.mennyiseg_liter});
+    } else if(tipus==='verschneiden'){
+      if(!quelle2EdenyId) { setSpeichert(false); return; }
+      const quelle2 = edenyTartalom.find(t=>t.edeny_id===quelle2EdenyId);
+      if(!quelle2) { setSpeichert(false); return; }
+      await kbUpdate('mallorca_edeny_tartalom', tartalom.id, {mennyiseg_liter: tartalom.mennyiseg_liter + quelle2.mennyiseg_liter});
+      await kbDelete('mallorca_edeny_tartalom', quelle2.id);
+      await kbInsert('mallorca_edeny_mozgasok', {tipus:'Verschneiden', forras_edeny_id:quelle2EdenyId, cel_edeny_id:edeny.id, tetel_id:quelle2.tetel_id, mennyiseg_liter:quelle2.mennyiseg_liter});
+    } else if(tipus==='leeren'){
+      await kbDelete('mallorca_edeny_tartalom', tartalom.id);
+      await kbInsert('mallorca_edeny_mozgasok', {tipus:'Leeren', forras_edeny_id:edeny.id, tetel_id:tartalom.tetel_id, mennyiseg_liter:tartalom.mennyiseg_liter});
+    }
+    setSpeichert(false);
+    onDone();
+  };
+
+  return React.createElement(KModalShell, {title:titel+' — '+edeny.nev, onClose},
+    tipus==='befuellen' && React.createElement(React.Fragment, null,
+      React.createElement(KField, {label:'Partie'}, React.createElement('select', {style:kInput(), value:tetelId, onChange:e=>setTetelId(e.target.value)},
+        React.createElement('option',{value:''}, '— wählen —'),
+        tetelek.map(t=>React.createElement('option', {key:t.id, value:t.id}, t.azonosito+' · '+(t.fajta||'')))
+      )),
+      React.createElement(KField, {label:'Menge (Liter)'}, React.createElement('input', {type:'number', style:kInput(), value:menge, onChange:e=>setMenge(e.target.value)}))
+    ),
+    tipus==='abstich' && React.createElement(KField, {label:'Ziel-Gefäß (leer)'},
+      React.createElement('select', {style:kInput(), value:zielEdenyId, onChange:e=>setZielEdenyId(e.target.value)},
+        React.createElement('option',{value:''}, '— wählen —'),
+        leereEdenyek.map(e=>React.createElement('option', {key:e.id, value:e.id}, e.nev+' ('+e.kapacitas_liter+' l)'))
+      )
+    ),
+    tipus==='aufteilen' && React.createElement(React.Fragment, null,
+      React.createElement('div', {style:{fontSize:12.5,color:kx.textLt,marginBottom:10}}, `Gesamt im Gefäß: ${tartalom.mennyiseg_liter} l`),
+      React.createElement(KField, {label:'Menge, die umzieht (Liter)'}, React.createElement('input', {type:'number', style:kInput(), value:menge, onChange:e=>setMenge(e.target.value)})),
+      React.createElement(KField, {label:'Ziel-Gefäß (leer)'},
+        React.createElement('select', {style:kInput(), value:zielEdenyId, onChange:e=>setZielEdenyId(e.target.value)},
+          React.createElement('option',{value:''}, '— wählen —'),
+          leereEdenyek.map(e=>React.createElement('option', {key:e.id, value:e.id}, e.nev+' ('+e.kapacitas_liter+' l)'))
+        )
+      )
+    ),
+    tipus==='zusammenfuehren' && React.createElement(KField, {label:'Zweites Gefäß (gleiche Partie)'},
+      React.createElement('select', {style:kInput(), value:quelle2EdenyId, onChange:e=>setQuelle2EdenyId(e.target.value)},
+        React.createElement('option',{value:''}, '— wählen —'),
+        gefuellteEdenyek.filter(e=>{ const t=edenyTartalom.find(x=>x.edeny_id===e.id); return t && t.tetel_id===tartalom.tetel_id; }).map(e=>React.createElement('option', {key:e.id, value:e.id}, e.nev))
+      )
+    ),
+    tipus==='verschneiden' && React.createElement(KField, {label:'Zweites Gefäß (wird verschnitten)'},
+      React.createElement('select', {style:kInput(), value:quelle2EdenyId, onChange:e=>setQuelle2EdenyId(e.target.value)},
+        React.createElement('option',{value:''}, '— wählen —'),
+        gefuellteEdenyek.map(e=>{ const t=edenyTartalom.find(x=>x.edeny_id===e.id); const tt = tetelek.find(x=>x.id===(t&&t.tetel_id)); return React.createElement('option', {key:e.id, value:e.id}, e.nev+' — '+(tt?tt.azonosito:'')); })
+      )
+    ),
+    tipus==='leeren' && React.createElement('div', {style:{fontSize:13,color:kx.textMid,marginBottom:14}}, `Der Inhalt (${tartalom.mennyiseg_liter} l) wird aus dem Gefäß entfernt. Diese Aktion kann nicht rückgängig gemacht werden.`),
+    React.createElement('button', {onClick:submit, disabled:speichert, style:kBtn(speichert)}, speichert?'Wird gespeichert…':'✓ Bestätigen')
+  );
+}
+
+// ---------- Partien (Tételek) ----------
+
+function PartienView({tetelek, edenyek, edenyTartalom, stadiumok, kezelesek, kezeloanyagok, onReload, canEdit}){
+  const [ujOffen, setUjOffen] = React.useState(false);
+  const [ausgewaehlt, setAusgewaehlt] = React.useState(null);
+
+  if(ausgewaehlt){
+    return React.createElement(PartieDetail, {
+      tetel: tetelek.find(t=>t.id===ausgewaehlt),
+      edenyek, edenyTartalom,
+      stadiumok: stadiumok.filter(s=>s.tetel_id===ausgewaehlt),
+      kezelesek: kezelesek.filter(k=>k.tetel_id===ausgewaehlt),
+      kezeloanyagok,
+      onBack: ()=>setAusgewaehlt(null),
+      onReload, canEdit
+    });
+  }
+
+  return React.createElement('div', {style:{padding:'14px'}},
+    React.createElement('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}},
+      React.createElement('div', {style:{fontFamily:'Georgia,serif',fontSize:18,fontWeight:700,color:kx.accent}}, 'Partien'),
+      canEdit && React.createElement('button', {onClick:()=>setUjOffen(true), style:{...kBtnMini,background:kx.accent,color:'#fff',border:'none',padding:'8px 14px'}}, '+ Neu')
+    ),
+    tetelek.length===0 ? React.createElement(KLeeresState, {text:'Noch keine Partien angelegt.'}) :
+    React.createElement('div', null, tetelek.map(t=>{
+      const stadien = stadiumok.filter(s=>s.tetel_id===t.id).sort((a,b)=>a.sorrend-b.sorrend);
+      const aktStadium = stadien.find(s=>s.sorrend===t.jelenlegi_stadium_sorrend);
+      const inhalt = edenyTartalom.filter(et=>et.tetel_id===t.id);
+      const gefaesse = inhalt.map(i=> (edenyek.find(e=>e.id===i.edeny_id)||{}).nev ).filter(Boolean);
+      return React.createElement('div', {key:t.id, onClick:()=>setAusgewaehlt(t.id), style:{...kCard(), cursor:'pointer'}},
+        React.createElement('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}},
+          React.createElement('div', null,
+            React.createElement('div', {style:{fontWeight:700,fontSize:15}}, t.azonosito),
+            React.createElement('div', {style:{fontSize:12,color:kx.textMid,marginTop:2}}, `${t.evjarat||''} · ${t.fajta||''} · ${t.borfajta||''}`),
+            gefaesse.length>0 && React.createElement('div', {style:{fontSize:11.5,color:kx.textLt,marginTop:3}}, '📦 '+gefaesse.join(', '))
+          ),
+          aktStadium && React.createElement('div', {style:{background:kx.tag,color:kx.accent,borderRadius:8,padding:'4px 9px',fontSize:11,fontWeight:600,whiteSpace:'nowrap'}}, aktStadium.nev)
+        )
+      );
+    })),
+    ujOffen && React.createElement(UjPartieModal, {onClose:()=>setUjOffen(false), onCreated:()=>{onReload();setUjOffen(false);}})
+  );
+}
+
+function UjPartieModal({onClose, onCreated}){
+  const [form, setForm] = React.useState({azonosito:'', evjarat:new Date().getFullYear(), fajta:'', borfajta:KB_BORFAJTAK[0], dulo:'', mennyiseg_kg:'', mennyiseg_liter:'', megjegyzes:''});
+  const [speichert, setSpeichert] = React.useState(false);
+  const submit = async () => {
+    if(!form.azonosito.trim()) return;
+    setSpeichert(true);
+    const created = await kbInsert('mallorca_tetelek', {
+      azonosito: form.azonosito.trim(), evjarat: parseInt(form.evjarat)||new Date().getFullYear(),
+      fajta: form.fajta||null, borfajta: form.borfajta,
+      dulo: form.dulo||null,
+      mennyiseg_kg: form.mennyiseg_kg? parseFloat(form.mennyiseg_kg): null,
+      mennyiseg_liter: form.mennyiseg_liter? parseFloat(form.mennyiseg_liter): null,
+      jelenlegi_stadium_sorrend: 1, allapot:'aktiv', megjegyzes: form.megjegyzes||null
+    });
+    if(created && created[0]){
+      const stadien = KB_STADIEN_SABLON[form.borfajta] || [];
+      const jetzt = new Date().toISOString();
+      for(let i=0;i<stadien.length;i++){
+        await kbInsert('mallorca_tetel_stadiumok', {tetel_id: created[0].id, nev: stadien[i], sorrend: i+1, elkezdve: i===0? jetzt: null});
+      }
+    }
+    setSpeichert(false);
+    onCreated();
+  };
+  return React.createElement(KModalShell, {title:'Neue Partie', onClose},
+    React.createElement(KField, {label:'Partie-Bezeichnung'}, React.createElement('input', {style:kInput(), placeholder:'z.B. Chardonnay 2026-1', value:form.azonosito, onChange:e=>setForm({...form,azonosito:e.target.value})})),
+    React.createElement('div', {style:{display:'flex',gap:10}},
+      React.createElement('div', {style:{flex:1}}, React.createElement(KField, {label:'Jahrgang'}, React.createElement('input', {type:'number', style:kInput(), value:form.evjarat, onChange:e=>setForm({...form,evjarat:e.target.value})}))),
+      React.createElement('div', {style:{flex:1}}, React.createElement(KField, {label:'Weintyp'}, React.createElement('select', {style:kInput(), value:form.borfajta, onChange:e=>setForm({...form,borfajta:e.target.value})}, KB_BORFAJTAK.map(b=>React.createElement('option',{key:b,value:b},b)))))
+    ),
+    React.createElement(KField, {label:'Rebsorte'}, React.createElement('input', {style:kInput(), placeholder:'z.B. Chardonnay', value:form.fajta, onChange:e=>setForm({...form,fajta:e.target.value})})),
+    React.createElement(KField, {label:'Lage / Fläche (optional)'}, React.createElement('input', {style:kInput(), value:form.dulo, onChange:e=>setForm({...form,dulo:e.target.value})})),
+    React.createElement('div', {style:{display:'flex',gap:10}},
+      React.createElement('div', {style:{flex:1}}, React.createElement(KField, {label:'Menge (kg)'}, React.createElement('input', {type:'number', style:kInput(), value:form.mennyiseg_kg, onChange:e=>setForm({...form,mennyiseg_kg:e.target.value})}))),
+      React.createElement('div', {style:{flex:1}}, React.createElement(KField, {label:'Menge (Liter)'}, React.createElement('input', {type:'number', style:kInput(), value:form.mennyiseg_liter, onChange:e=>setForm({...form,mennyiseg_liter:e.target.value})})))
+    ),
+    React.createElement(KField, {label:'Bemerkung'}, React.createElement('textarea', {style:{...kInput(),minHeight:50}, value:form.megjegyzes, onChange:e=>setForm({...form,megjegyzes:e.target.value})})),
+    React.createElement('button', {onClick:submit, disabled: speichert || !form.azonosito.trim(), style:kBtn(speichert || !form.azonosito.trim())}, speichert?'Speichern…':'Partie anlegen')
+  );
+}
+
+function PartieDetail({tetel, edenyek, edenyTartalom, stadiumok, kezelesek, kezeloanyagok, onBack, onReload, canEdit}){
+  const [ujKezelesOffen, setUjKezelesOffen] = React.useState(false);
+  const sortiert = [...stadiumok].sort((a,b)=>a.sorrend-b.sorrend);
+  const inhalt = edenyTartalom.filter(et=>et.tetel_id===tetel.id);
+
+  const naechstesStadium = async () => {
+    const akt = sortiert.find(s=>s.sorrend===tetel.jelenlegi_stadium_sorrend);
+    const next = sortiert.find(s=>s.sorrend===tetel.jelenlegi_stadium_sorrend+1);
+    if(!next) return;
+    const jetzt = new Date().toISOString();
+    if(akt) await kbUpdate('mallorca_tetel_stadiumok', akt.id, {befejezve: jetzt});
+    await kbUpdate('mallorca_tetel_stadiumok', next.id, {elkezdve: jetzt});
+    await kbUpdate('mallorca_tetelek', tetel.id, {jelenlegi_stadium_sorrend: next.sorrend});
+    onReload();
+  };
+
+  return React.createElement('div', {style:{padding:'14px'}},
+    React.createElement('div', {onClick:onBack, style:{fontSize:12.5,color:kx.accent,cursor:'pointer',marginBottom:10}}, '← Zurück zu Partien'),
+    React.createElement('div', {style:{fontFamily:'Georgia,serif',fontSize:19,fontWeight:700,color:kx.text,marginBottom:2}}, tetel.azonosito),
+    React.createElement('div', {style:{fontSize:12.5,color:kx.textMid,marginBottom:14}}, `${tetel.evjarat||''} · ${tetel.fajta||''} · ${tetel.borfajta||''}${tetel.dulo?' · '+tetel.dulo:''}`),
+
+    React.createElement('div', {style:kCard()},
+      React.createElement('div', {style:{fontWeight:700,fontSize:13,color:kx.accent,marginBottom:10}}, 'Stadien'),
+      React.createElement('div', {style:{display:'flex',flexWrap:'wrap',gap:6,marginBottom: canEdit?12:0}},
+        sortiert.map(s=>{
+          const aktiv = s.sorrend===tetel.jelenlegi_stadium_sorrend;
+          const fertig = s.befejezve!=null;
+          return React.createElement('div', {key:s.id, style:{
+            padding:'6px 11px', borderRadius:8, fontSize:11.5, fontWeight:600,
+            background: aktiv? kx.accent : fertig? kx.tag : '#f0f0f0',
+            color: aktiv? '#fff' : fertig? kx.accent : kx.textLt
+          }}, s.nev);
+        })
+      ),
+      canEdit && tetel.jelenlegi_stadium_sorrend < sortiert.length && React.createElement('button', {onClick:naechstesStadium, style:{...kBtnMini,background:kx.accent,color:'#fff',border:'none'}}, 'Nächstes Stadium →')
+    ),
+
+    React.createElement('div', {style:kCard()},
+      React.createElement('div', {style:{fontWeight:700,fontSize:13,color:kx.accent,marginBottom:10}}, 'Gefäße'),
+      inhalt.length===0 ? React.createElement('div', {style:{fontSize:12.5,color:kx.textLt}}, 'In keinem Gefäß.') :
+      inhalt.map(i=>{
+        const g = edenyek.find(e=>e.id===i.edeny_id);
+        return React.createElement('div', {key:i.id, style:{fontSize:13,padding:'4px 0'}}, `${g?g.nev:'?'} · ${i.mennyiseg_liter} l`);
+      })
+    ),
+
+    React.createElement('div', {style:kCard()},
+      React.createElement('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}},
+        React.createElement('div', {style:{fontWeight:700,fontSize:13,color:kx.accent}}, 'Behandlungen'),
+        canEdit && React.createElement('button', {onClick:()=>setUjKezelesOffen(true), style:kBtnMini}, '+ Neu')
+      ),
+      kezelesek.length===0 ? React.createElement('div', {style:{fontSize:12.5,color:kx.textLt}}, 'Noch keine Behandlungen erfasst.') :
+      [...kezelesek].sort((a,b)=>b.datum.localeCompare(a.datum)).map(k=>{
+        const mittel = kezeloanyagok.find(m=>m.id===k.kezeloanyag_id);
+        return React.createElement('div', {key:k.id, style:{padding:'8px 0',borderBottom:`1px solid ${kx.border}`}},
+          React.createElement('div', {style:{display:'flex',justifyContent:'space-between'}},
+            React.createElement('div', {style:{fontWeight:600,fontSize:13}}, k.tipus),
+            React.createElement('div', {style:{fontSize:11.5,color:kx.textLt}}, k.datum)
+          ),
+          (mittel || k.mennyiseg) && React.createElement('div', {style:{fontSize:12,color:kx.textMid,marginTop:2}}, `${mittel?mittel.nev+' · ':''}${k.mennyiseg?k.mennyiseg+' '+(k.mertekegyseg||''):''}`),
+          k.megjegyzes && React.createElement('div', {style:{fontSize:11.5,color:kx.textLt,marginTop:2}}, k.megjegyzes)
+        );
+      })
+    ),
+    ujKezelesOffen && React.createElement(UjKezelesModal, {tetel, kezeloanyagok, stadiumok:sortiert, onClose:()=>setUjKezelesOffen(false), onCreated:()=>{onReload();setUjKezelesOffen(false);}})
+  );
+}
+
+const KB_KEZELES_TIPUSOK = ['Schwefelung (SO₂)','Bentonit-Schönung','Filtration','Abstich','Anstellen (Hefe)','Nährsalz-Zugabe','Säuerung','Entsäuerung','Kälte­stabilisierung','Sonstige Behandlung'];
+
+function UjKezelesModal({tetel, kezeloanyagok, stadiumok, onClose, onCreated}){
+  const [form, setForm] = React.useState({stadium_nev: (stadiumok.find(s=>s.sorrend===tetel.jelenlegi_stadium_sorrend)||{}).nev||'', tipus:KB_KEZELES_TIPUSOK[0], kezeloanyag_id:'', mennyiseg:'', mertekegyseg:'g/hl', datum:new Date().toISOString().slice(0,10), vegezte:'', megjegyzes:''});
+  const [speichert, setSpeichert] = React.useState(false);
+  const submit = async () => {
+    setSpeichert(true);
+    await kbInsert('mallorca_kezelesek', {
+      tetel_id: tetel.id, stadium_nev: form.stadium_nev||null, tipus: form.tipus,
+      kezeloanyag_id: form.kezeloanyag_id||null,
+      mennyiseg: form.mennyiseg? parseFloat(form.mennyiseg): null,
+      mertekegyseg: form.mertekegyseg||null, datum: form.datum,
+      vegezte: form.vegezte||null, megjegyzes: form.megjegyzes||null
+    });
+    setSpeichert(false);
+    onCreated();
+  };
+  return React.createElement(KModalShell, {title:'Neue Behandlung', onClose},
+    React.createElement(KField, {label:'Datum'}, React.createElement('input', {type:'date', style:kInput(), value:form.datum, onChange:e=>setForm({...form,datum:e.target.value})})),
+    React.createElement(KField, {label:'Art der Behandlung'}, React.createElement('select', {style:kInput(), value:form.tipus, onChange:e=>setForm({...form,tipus:e.target.value})}, KB_KEZELES_TIPUSOK.map(t=>React.createElement('option',{key:t,value:t},t)))),
+    React.createElement(KField, {label:'Behandlungsmittel (optional)'}, React.createElement('select', {style:kInput(), value:form.kezeloanyag_id, onChange:e=>setForm({...form,kezeloanyag_id:e.target.value})},
+      React.createElement('option', {value:''}, '— keins —'),
+      kezeloanyagok.map(m=>React.createElement('option', {key:m.id, value:m.id}, m.nev))
+    )),
+    React.createElement('div', {style:{display:'flex',gap:10}},
+      React.createElement('div', {style:{flex:1}}, React.createElement(KField, {label:'Menge'}, React.createElement('input', {type:'number', style:kInput(), value:form.mennyiseg, onChange:e=>setForm({...form,mennyiseg:e.target.value})}))),
+      React.createElement('div', {style:{flex:1}}, React.createElement(KField, {label:'Einheit'}, React.createElement('input', {style:kInput(), value:form.mertekegyseg, onChange:e=>setForm({...form,mertekegyseg:e.target.value})})))
+    ),
+    React.createElement(KField, {label:'Ausgeführt von (optional)'}, React.createElement('input', {style:kInput(), value:form.vegezte, onChange:e=>setForm({...form,vegezte:e.target.value})})),
+    React.createElement(KField, {label:'Bemerkung'}, React.createElement('textarea', {style:{...kInput(),minHeight:50}, value:form.megjegyzes, onChange:e=>setForm({...form,megjegyzes:e.target.value})})),
+    React.createElement('button', {onClick:submit, disabled:speichert, style:kBtn(speichert)}, speichert?'Speichern…':'Behandlung speichern')
+  );
+}
+
+// ---------- Behandlungsmittel (Kezelőanyagok) ----------
+
+function BehandlungsmittelView({kezeloanyagok, onReload, canEdit}){
+  const [ujOffen, setUjOffen] = React.useState(false);
+  return React.createElement('div', {style:{padding:'14px'}},
+    React.createElement('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}},
+      React.createElement('div', {style:{fontFamily:'Georgia,serif',fontSize:18,fontWeight:700,color:kx.accent}}, 'Behandlungsmittel'),
+      canEdit && React.createElement('button', {onClick:()=>setUjOffen(true), style:{...kBtnMini,background:kx.accent,color:'#fff',border:'none',padding:'8px 14px'}}, '+ Neu')
+    ),
+    kezeloanyagok.length===0 ? React.createElement(KLeeresState, {text:'Noch keine Behandlungsmittel erfasst.'}) :
+    kezeloanyagok.map(m=>React.createElement('div', {key:m.id, style:{...kCard(), padding:'10px 14px', display:'flex', justifyContent:'space-between',alignItems:'center'}},
+      React.createElement('div', null,
+        React.createElement('div', {style:{fontWeight:600,fontSize:13.5}}, m.nev),
+        React.createElement('div', {style:{fontSize:11.5,color:kx.textLt}}, `${m.tipus||''}${m.mertekegyseg?' · Einheit: '+m.mertekegyseg:''}`)
+      )
+    )),
+    ujOffen && React.createElement(UjBehandlungsmittelModal, {onClose:()=>setUjOffen(false), onCreated:()=>{onReload();setUjOffen(false);}})
+  );
+}
+
+function UjBehandlungsmittelModal({onClose, onCreated}){
+  const [form, setForm] = React.useState({nev:'', tipus:'', mertekegyseg:'g/hl', megjegyzes:''});
+  const [speichert, setSpeichert] = React.useState(false);
+  const submit = async () => {
+    if(!form.nev.trim()) return;
+    setSpeichert(true);
+    await kbInsert('mallorca_kezeloanyagok', {nev:form.nev.trim(), tipus:form.tipus||null, mertekegyseg:form.mertekegyseg||null, megjegyzes:form.megjegyzes||null});
+    setSpeichert(false);
+    onCreated();
+  };
+  return React.createElement(KModalShell, {title:'Neues Behandlungsmittel', onClose},
+    React.createElement(KField, {label:'Name'}, React.createElement('input', {style:kInput(), placeholder:'z.B. Bentonit', value:form.nev, onChange:e=>setForm({...form,nev:e.target.value})})),
+    React.createElement(KField, {label:'Typ (optional)'}, React.createElement('input', {style:kInput(), placeholder:'z.B. Schönungsmittel', value:form.tipus, onChange:e=>setForm({...form,tipus:e.target.value})})),
+    React.createElement(KField, {label:'Standard-Einheit'}, React.createElement('input', {style:kInput(), value:form.mertekegyseg, onChange:e=>setForm({...form,mertekegyseg:e.target.value})})),
+    React.createElement('button', {onClick:submit, disabled: speichert || !form.nev.trim(), style:kBtn(speichert || !form.nev.trim())}, speichert?'Speichern…':'Anlegen')
+  );
+}
+
+// ---------- Root ----------
+
+function KellerApp(){
+  const [tab, setTab] = React.useState('partien');
+  const [edenyek, setEdenyek] = React.useState([]);
+  const [tetelek, setTetelek] = React.useState([]);
+  const [edenyTartalom, setEdenyTartalom] = React.useState([]);
+  const [stadiumok, setStadiumok] = React.useState([]);
+  const [kezelesek, setKezelesek] = React.useState([]);
+  const [kezeloanyagok, setKezeloanyagok] = React.useState([]);
+  const [geladen, setGeladen] = React.useState(false);
+  const [canEdit, setCanEdit] = React.useState(!window.__workerMode);
+
+  const reload = async () => {
+    const [e, t, et, st, kz, km] = await Promise.all([
+      kbSelect('mallorca_edenyek'), kbSelect('mallorca_tetelek'), kbSelect('mallorca_edeny_tartalom'),
+      kbSelect('mallorca_tetel_stadiumok'), kbSelect('mallorca_kezelesek'), kbSelect('mallorca_kezeloanyagok')
+    ]);
+    setEdenyek(e); setTetelek(t); setEdenyTartalom(et); setStadiumok(st); setKezelesek(kz); setKezeloanyagok(km);
+    setGeladen(true);
+  };
+
+  React.useEffect(()=>{ reload(); const iv = setInterval(()=>setCanEdit(!window.__workerMode), 1000); return ()=>clearInterval(iv); }, []);
+
+  if(!geladen){
+    return React.createElement('div', {style:{display:'flex',alignItems:'center',justifyContent:'center',height:'60vh'}},
+      React.createElement('div', {style:{fontFamily:'Georgia,serif',color:kx.textMid}}, 'Wird geladen…')
+    );
+  }
+
+  return React.createElement('div', {style:{minHeight:'100vh',background:kx.bg,fontFamily:'system-ui,-apple-system,sans-serif',maxWidth:480,margin:'0 auto',paddingBottom:94}},
+    React.createElement('div', {style:{background:kx.bgDark,padding:'13px 16px 9px',position:'sticky',top:0,zIndex:100,boxShadow:'0 2px 8px rgba(0,0,0,0.35)'}},
+      React.createElement('div', {style:{fontSize:10,color:kx.accentLt,letterSpacing:2,textTransform:'uppercase',marginBottom:1}}, 'Mallorca · Weingut'),
+      React.createElement('div', {style:{fontSize:18,fontWeight:700,color:'#fff',fontFamily:'Georgia,serif'}}, 'Kellerbuch')
+    ),
+    React.createElement('div', {style:{display:'flex',background:'#fff',borderBottom:`1px solid ${kx.border}`,position:'sticky',top:55,zIndex:99}},
+      [['partien','Partien'],['gefaesse','Gefäße'],['mittel','Behandlungsmittel']].map(([id,label])=>
+        React.createElement('button', {key:id, onClick:()=>setTab(id), style:{flex:1,padding:'10px 6px',border:'none',background:'none',cursor:'pointer',fontSize:12.5,fontWeight: tab===id?700:400,color: tab===id?kx.accent:kx.textMid,borderBottom: tab===id?`3px solid ${kx.accent}`:'3px solid transparent'}}, label)
+      )
+    ),
+    !canEdit && React.createElement('div', {style:{background:kx.goldLt,color:kx.gold,fontSize:11.5,textAlign:'center',padding:'6px 10px'}}, 'Mitarbeiter-Ansicht — nur lesen'),
+    tab==='partien' && React.createElement(PartienView, {tetelek, edenyek, edenyTartalom, stadiumok, kezelesek, kezeloanyagok, onReload:reload, canEdit}),
+    tab==='gefaesse' && React.createElement(GefaesseView, {edenyek, edenyTartalom, tetelek, onReload:reload, canEdit}),
+    tab==='mittel' && React.createElement(BehandlungsmittelView, {kezeloanyagok, onReload:reload, canEdit})
+  );
+}
+
+const kellerRootEl = document.getElementById('keller-root');
+if(kellerRootEl){
+  ReactDOM.createRoot(kellerRootEl).render(React.createElement(KellerApp));
+}
+
 </script>
 </body>
 </html>
