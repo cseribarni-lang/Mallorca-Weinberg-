@@ -51,6 +51,10 @@
       <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#5C7A2E">Ernte nach Fläche × Sorte</div>
       <div id="et-table-sorte"></div>
     </div>
+    <div id="et-card-bridge" style="background:#fff;border-radius:14px;padding:16px;margin-bottom:10px;border:1px solid #DDD5C0;display:none">
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#5C7A2E">Ins Kellerbuch übernehmen</div>
+      <div id="et-bridge-list"></div>
+    </div>
     <div style="font-size:11px;color:#888;text-align:center;padding:6px 0 16px">Daten aus dem Tagebuch (Handarbeit → Weinlese). Neue Einträge bitte weiterhin im Tagebuch erfassen.</div>
   </div>
 </div>
@@ -565,6 +569,103 @@ async function etRender(){
       <div style="font-weight:600;color:#5C7A2E">${etFmtKg(kg)} kg</div>
     </div>
   `).join('') : '<div style="font-size:13px;color:#888;text-align:center;padding:10px 0">—</div>';
+
+  await etRenderBridge(lese, jahr);
+}
+
+// ---------- Brücke: Ernte → Kellerbuch ----------
+const ET_LINK_KEY = 'ernte_kellerbuch_links';
+const ET_ROTWEIN_SORTEN = ['Callet','Manto Negro','Merlot','Syrah','Cabernet Sauvignon','Tempranillo'];
+let etLinks = {};
+let etAktuelleLese = [];
+
+async function etLinksLaden(){
+  try{
+    const r = await storage.get(ET_LINK_KEY);
+    etLinks = r && r.value ? JSON.parse(r.value) : {};
+  }catch(e){ etLinks = {}; }
+}
+async function etLinksSpeichern(){
+  await storage.set(ET_LINK_KEY, JSON.stringify(etLinks));
+}
+function etGruppenSchluessel(flaeche, sorte){ return flaeche+'::'+sorte; }
+function etWeintypSchaetzen(sorte){ return ET_ROTWEIN_SORTEN.includes(sorte) ? 'Rotwein' : 'Weißwein'; }
+
+async function etRenderBridge(lese, jahr){
+  if(window.__workerMode){ document.getElementById('et-card-bridge').style.display='none'; return; }
+  await etLinksLaden();
+  etAktuelleLese = lese;
+  const gruppen = {};
+  lese.forEach(e=>{
+    if(!e.flaeche || !e.sorte) return;
+    const k = etGruppenSchluessel(e.flaeche, e.sorte);
+    if(!gruppen[k]) gruppen[k] = {flaeche:e.flaeche, sorte:e.sorte, kg:0};
+    gruppen[k].kg += Number(e.gewicht)||0;
+  });
+  const keys = Object.keys(gruppen);
+  const card = document.getElementById('et-card-bridge');
+  if(keys.length===0){ card.style.display='none'; return; }
+  card.style.display='';
+  document.getElementById('et-bridge-list').innerHTML = keys.map(k=>{
+    const g = gruppen[k];
+    const link = etLinks[k];
+    if(link){
+      return `<div style="border:1px solid #DDD5C0;border-radius:10px;padding:10px 12px;margin-bottom:8px">
+        <div style="font-weight:600;font-size:13px">${g.flaeche} · ${g.sorte}</div>
+        <div style="font-size:11.5px;color:#888;margin-top:2px">${etFmtKg(g.kg)} kg insgesamt</div>
+        <div style="font-size:12px;color:#5C7A2E;font-weight:600;margin-top:4px">✓ Partie angelegt: ${link.azonosito}</div>
+      </div>`;
+    }
+    const vorschlag = `${g.flaeche}-${g.sorte}-${jahr}`.replace(/\s+/g,'');
+    return `<div style="border:1px dashed #DDD5C0;border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div style="font-weight:600;font-size:13px">${g.flaeche} · ${g.sorte}</div>
+      <div style="font-size:11.5px;color:#888;margin-top:2px;margin-bottom:8px">${etFmtKg(g.kg)} kg insgesamt</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <input type="text" id="et-bz-${k}" value="${vorschlag}" style="flex:1;padding:7px 9px;border:1px solid #DDD5C0;border-radius:7px;font-size:12.5px">
+        <select id="et-bt-${k}" style="padding:7px 9px;border:1px solid #DDD5C0;border-radius:7px;font-size:12.5px">
+          <option value="Weißwein" ${etWeintypSchaetzen(g.sorte)==='Weißwein'?'selected':''}>Weißwein</option>
+          <option value="Rotwein" ${etWeintypSchaetzen(g.sorte)==='Rotwein'?'selected':''}>Rotwein</option>
+          <option value="Rosé">Rosé</option>
+        </select>
+      </div>
+      <button id="et-bbtn-${k}" onclick="etStartPartie('${k}')" style="width:100%;padding:8px 0;background:#5C7A2E;color:#fff;border:none;border-radius:7px;font-weight:700;font-size:12.5px;cursor:pointer">Partie im Kellerbuch anlegen</button>
+    </div>`;
+  }).join('');
+}
+
+async function etStartPartie(key){
+  const btn = document.getElementById('et-bbtn-'+key);
+  btn.disabled = true; btn.textContent = 'Wird angelegt…';
+  try{
+    const [flaeche, sorte] = key.split('::');
+    const kg = etAktuelleLese.filter(e=>e.flaeche===flaeche && e.sorte===sorte).reduce((s,e)=>s+(Number(e.gewicht)||0),0);
+    const azonosito = document.getElementById('et-bz-'+key).value;
+    const borfajta = document.getElementById('et-bt-'+key).value;
+    const jahr = document.getElementById('et-jahr').value;
+
+    const created = await kbInsert('mallorca_tetelek', {
+      azonosito, evjarat: parseInt(jahr), fajta: sorte, borfajta, dulo: flaeche,
+      mennyiseg_kg: kg, mennyiseg_liter: null,
+      jelenlegi_stadium_sorrend: 1, allapot: 'aktiv',
+      megjegyzes: 'Automatisch aus dem Ernte-Modul angelegt'
+    });
+    if(created && created[0]){
+      const stadien = KB_STADIEN_SABLON[borfajta] || [];
+      const jetzt = new Date().toISOString();
+      for(let i=0;i<stadien.length;i++){
+        await kbInsert('mallorca_tetel_stadiumok', {tetel_id: created[0].id, nev: stadien[i], sorrend: i+1, elkezdve: i===0? jetzt: null});
+      }
+      etLinks[key] = { azonosito, tetelId: created[0].id, ts: jetzt };
+      await etLinksSpeichern();
+      const jahrJetzt = document.getElementById('et-jahr').value;
+      const { eintraege } = await etLoad();
+      const leseJetzt = eintraege.filter(e=>e.vorgang==='Weinlese' && e.datum && e.datum.startsWith(jahrJetzt));
+      await etRenderBridge(leseJetzt, jahrJetzt);
+    }
+  }catch(e){
+    btn.disabled = false; btn.textContent = 'Partie im Kellerbuch anlegen';
+    alert('Fehler beim Anlegen der Partie: '+e.message);
+  }
 }
 
 etSwitchTab('arbeit');
