@@ -1310,7 +1310,7 @@ async function sztUjTeruletMentes(){
 
 <script>
 const RF_SB_URL='https://cjbpsvgomsdxaewsassl.supabase.co';
-const RF_SB_KEY='sb_publishable_6UD_aMtMYZxsHd5wXUmthw_UodjS_yH';
+const RF_SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNqYnBzdmdvbXNkeGFld3Nhc3NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mjc5MDYsImV4cCI6MjA5NzIwMzkwNn0.iZZoFikaAW072CSZ3kaCRf7T_s3k94naM2ywDpg7ujk';
 const RF_SB_H={'apikey':RF_SB_KEY,'Authorization':'Bearer '+RF_SB_KEY,'Content-Type':'application/json'};
 let rfMessungen = [];
 let rfLetzteQuelle = null; // welches Feld der Nutzer zuletzt manuell befüllt hat
@@ -1431,8 +1431,12 @@ async function rfSave(){
       ph: document.getElementById('rf-ph').value? parseFloat(document.getElementById('rf-ph').value): null,
       megjegyzes: document.getElementById('rf-megjegyzes').value || null
     };
-    const r = await fetch(RF_SB_URL+'/rest/v1/mallorca_reifekontrolle', {method:'POST', headers: RF_SB_H, body: JSON.stringify(body), signal: AbortSignal.timeout(8000)});
-    if(!r.ok) throw new Error('Speichern fehlgeschlagen');
+    const r = await fetch(RF_SB_URL+'/rest/v1/mallorca_reifekontrolle', {method:'POST', headers: {...RF_SB_H, 'Prefer':'return=minimal'}, body: JSON.stringify(body), signal: AbortSignal.timeout(8000)});
+    if(!r.ok){
+      let detail = '';
+      try{ const err = await r.json(); detail = err.message || err.hint || JSON.stringify(err); }catch(_){ try{ detail = await r.text(); }catch(__){} }
+      throw new Error(`Speichern fehlgeschlagen (${r.status}): ${detail || 'unbekannter Fehler'}`);
+    }
     document.getElementById('rf-oechsle').value = '';
     document.getElementById('rf-kmw').value = '';
     document.getElementById('rf-brix').value = '';
